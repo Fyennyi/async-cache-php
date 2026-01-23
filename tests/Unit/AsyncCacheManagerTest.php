@@ -121,8 +121,9 @@ class AsyncCacheManagerTest extends TestCase
         // Rate limited
         $this->rateLimiter->expects($this->once())->method('isLimited')->willReturn(true);
 
+        $promise = $this->manager->wrap($key, fn() => Create::promiseFor('new'), $options);
+        
         $this->expectException(RateLimitException::class);
-
-        $this->manager->wrap($key, fn() => Create::promiseFor('new'), $options);
+        $promise->wait();
     }
 }
