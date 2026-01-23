@@ -119,7 +119,7 @@ class AsyncCacheManagerTest extends TestCase
         $this->cache->expects($this->once())->method('get')->willReturn(null);
 
         // Rate limited
-        $this->rate_limiter->expects($this->once())->method('isLimited')->willReturn(true);
+        $this->rateLimiter->expects($this->once())->method('isLimited')->willReturn(true);
 
         $this->expectException(RateLimitException::class);
 
@@ -135,7 +135,7 @@ class AsyncCacheManagerTest extends TestCase
         $this->cache->method('get')->willReturn(null);
 
         // Verify recordExecution is called
-        $this->rate_limiter->expects($this->once())
+        $this->rateLimiter->expects($this->once())
             ->method('recordExecution')
             ->with('api_limit');
 
