@@ -1,0 +1,95 @@
+site_name: Async Cache PHP
+site_description: An asynchronous caching abstraction layer for PHP with built-in rate limiting and stale-while-revalidate support.
+site_url: https://fyennyi.github.io/async-cache-php
+
+repo_name: Fyennyi/async-cache-php
+repo_url: https://github.com/Fyennyi/async-cache-php
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; 2024 - 2026 Serhii Cherneha
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.top
+    - navigation.instant
+    - navigation.tracking
+    - navigation.expand
+    - navigation.tabs
+    - navigation.footer
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep-orange
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep-orange
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Usage:
+    - Basic Setup: usage/setup.md
+    - Wrapping Operations: usage/wrapping.md
+    - Rate Limiting: usage/rate-limiting.md
+  - Concepts:
+    - Stale-While-Limited: concepts/stale-while-limited.md
+    - Cache TTL vs Grace Period: concepts/ttl.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+      extend_pygments_lang:
+        - name: php
+          lang: php
+          options:
+            startinline: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: datetime
+  - git-committers:
+      repository: Fyennyi/async-cache-php
+      branch: main
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Fyennyi
+    - icon: fontawesome/brands/x-twitter
+      link: https://x.com/CSSMGroup
+    - icon: fontawesome/brands/instagram
+      link: https://www.instagram.com/cssm.group
+    - icon: fontawesome/brands/facebook
+      link: https://www.facebook.com/cssm.group
+    - icon: fontawesome/brands/linkedin
+      link: https://www.linkedin.com/company/cssmgroup
+    - icon: fontawesome/solid/paper-plane
+      link: mailto:questions@cssm.pp.ua
