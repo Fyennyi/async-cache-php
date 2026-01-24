@@ -18,14 +18,14 @@ class AsyncCacheManagerTest extends TestCase
     private MockObject|RateLimiterInterface $rateLimiter;
     private AsyncCacheManager $manager;
 
-    protected function setUp(): void
+    protected function setUp() : void
     {
         $this->cache = $this->createMock(CacheInterface::class);
         $this->rateLimiter = $this->createMock(RateLimiterInterface::class);
         $this->manager = new AsyncCacheManager($this->cache, $this->rateLimiter);
     }
 
-    public function testReturnsFreshCacheImmediately(): void
+    public function testReturnsFreshCacheImmediately() : void
     {
         $key = 'test_key';
         $data = 'cached_data';
@@ -49,7 +49,7 @@ class AsyncCacheManagerTest extends TestCase
         $this->assertSame($data, $result);
     }
 
-    public function testFetchesNewDataOnCacheMiss(): void
+    public function testFetchesNewDataOnCacheMiss() : void
     {
         $key = 'test_key';
         $newData = 'new_data';
@@ -57,7 +57,7 @@ class AsyncCacheManagerTest extends TestCase
 
         // Mock cache miss
         $this->cache->expects($this->once())->method('get')->with($key)->willReturn(null);
-        
+
         // Should store new data
         $this->cache->expects($this->once())->method('set');
 
@@ -67,7 +67,7 @@ class AsyncCacheManagerTest extends TestCase
         $this->assertSame($newData, $result);
     }
 
-    public function testReturnsStaleDataIfRateLimited(): void
+    public function testReturnsStaleDataIfRateLimited() : void
     {
         $key = 'test_key';
         $staleData = 'stale_data';
@@ -106,7 +106,7 @@ class AsyncCacheManagerTest extends TestCase
         $this->assertFalse($called, "Factory should not have been called");
     }
 
-    public function testThrowsExceptionIfRateLimitedAndNoStaleData(): void
+    public function testThrowsExceptionIfRateLimitedAndNoStaleData() : void
     {
         $key = 'test_key';
         $options = new CacheOptions(
@@ -127,7 +127,7 @@ class AsyncCacheManagerTest extends TestCase
         $promise->wait();
     }
 
-    public function testRecordsExecutionWhenRateLimitKeyIsProvided(): void
+    public function testRecordsExecutionWhenRateLimitKeyIsProvided() : void
     {
         $key = 'test_key';
         $options = new CacheOptions(rate_limit_key: 'api_limit');
@@ -143,13 +143,13 @@ class AsyncCacheManagerTest extends TestCase
         $promise->wait();
     }
 
-    public function testDoesNotCacheIfTtlIsNull(): void
+    public function testDoesNotCacheIfTtlIsNull() : void
     {
         $key = 'test_key';
         $options = new CacheOptions(ttl: null);
 
         $this->cache->method('get')->willReturn(null);
-        
+
         // Verify set is NEVER called
         $this->cache->expects($this->never())->method('set');
 
@@ -157,7 +157,7 @@ class AsyncCacheManagerTest extends TestCase
         $promise->wait();
     }
 
-    public function testClearsCache(): void
+    public function testClearsCache() : void
     {
         $this->cache->expects($this->once())
             ->method('clear')
@@ -166,7 +166,7 @@ class AsyncCacheManagerTest extends TestCase
         $this->assertTrue($this->manager->clear());
     }
 
-    public function testDeletesCacheKey(): void
+    public function testDeletesCacheKey() : void
     {
         $key = 'test_key';
 
