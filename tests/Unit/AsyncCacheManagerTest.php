@@ -156,4 +156,25 @@ class AsyncCacheManagerTest extends TestCase
         $promise = $this->manager->wrap($key, fn() => Create::promiseFor('data'), $options);
         $promise->wait();
     }
+
+    public function testClearsCache(): void
+    {
+        $this->cache->expects($this->once())
+            ->method('clear')
+            ->willReturn(true);
+
+        $this->assertTrue($this->manager->clear());
+    }
+
+    public function testDeletesCacheKey(): void
+    {
+        $key = 'test_key';
+
+        $this->cache->expects($this->once())
+            ->method('delete')
+            ->with($key)
+            ->willReturn(true);
+
+        $this->assertTrue($this->manager->delete($key));
+    }
 }
