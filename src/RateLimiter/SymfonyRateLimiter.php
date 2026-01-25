@@ -2,8 +2,8 @@
 
 namespace Fyennyi\AsyncCache\RateLimiter;
 
-use Symfony\Component\RateLimiter\LimiterRateInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use Symfony\Component\RateLimiter\Storage\StorageInterface;
 
 /**
@@ -11,14 +11,13 @@ use Symfony\Component\RateLimiter\Storage\StorageInterface;
  */
 class SymfonyRateLimiter implements RateLimiterInterface
 {
-    private RateLimiterFactory $factory;
+    private StorageInterface $storage;
     private array $limiters = [];
     private array $config = [];
 
     public function __construct(?StorageInterface $storage = null)
     {
-        // Use in-memory storage by default
-        $this->factory = new RateLimiterFactory([], $storage);
+        $this->storage = $storage ?? new InMemoryStorage();
     }
 
     public function isLimited(string $key) : bool
@@ -39,11 +38,8 @@ class SymfonyRateLimiter implements RateLimiterInterface
             return;
         }
 
-        // In Symfony's implementation, consuming a token is both the check AND the record
-        // We already checked/consumed in isLimited(), so this is a no-op
-        // But for interface compatibility, we ensure the token is consumed
         $limiter = $this->limiters[$key];
-        $limiter->consume(1)->wait(); // Ensure token is consumed and wait if needed
+        $limiter->consume(1);
     }
 
     /**
@@ -74,13 +70,14 @@ class SymfonyRateLimiter implements RateLimiterInterface
     {
         $this->config[$key] = $seconds;
         
-        // Create or update limiter for this key
-        // Convert to rate format: X requests per Y seconds
-        $this->limiters[$key] = $this->factory->create([
+        // Create a dedicated factory for this key with specific configuration
+        $factory = new RateLimiterFactory([
             'id' => $key,
             'policy' => 'token_bucket',
-            'limit' => 1, // 1 request
+            'limit' => 1,
             'rate' => ['interval' => $seconds . ' seconds'],
-        ]);
+        ], $this->storage);
+
+        $this->limiters[$key] = $factory->create();
     }
 }
