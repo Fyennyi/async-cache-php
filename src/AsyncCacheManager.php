@@ -4,6 +4,7 @@ namespace Fyennyi\AsyncCache;
 
 use Fyennyi\AsyncCache\Exception\RateLimitException;
 use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
+use Fyennyi\AsyncCache\RateLimiter\RateLimiterFactory;
 use GuzzleHttp\Promise\Create;
 use GuzzleHttp\Promise\PromiseInterface;
 use Psr\SimpleCache\CacheInterface;
@@ -18,12 +19,22 @@ class AsyncCacheManager
 
     /**
      * @param  CacheInterface  $cache_adapter  The PSR-16 cache implementation
-     * @param  RateLimiterInterface  $rate_limiter  The rate limiter implementation
+     * @param  RateLimiterInterface|null  $rate_limiter  The rate limiter implementation
+     * @param  string  $rate_limiter_type  Type of rate limiter to use
      */
     public function __construct(
         private CacheInterface $cache_adapter,
-        private RateLimiterInterface $rate_limiter
+        private ?RateLimiterInterface $rate_limiter = null,
+        private string $rate_limiter_type = 'auto'
     ) {
+        if ($this->rate_limiter === null) {
+            $this->rate_limiter = match ($this->rate_limiter_type) {
+                'symfony' => RateLimiterFactory::create('symfony', $this->cache_adapter),
+                'in_memory' => RateLimiterFactory::create('in_memory', $this->cache_adapter),
+                'auto' => RateLimiterFactory::createBest($this->cache_adapter),
+                default => throw new \InvalidArgumentException("Unknown rate limiter type: {$this->rate_limiter_type}")
+            };
+        }
     }
 
     /**
@@ -143,5 +154,18 @@ class AsyncCacheManager
     public function getRateLimiter() : RateLimiterInterface
     {
         return $this->rate_limiter;
+    }
+
+    /**
+     * Clears the rate limiter state
+     * 
+     * @param string|null $key The key to clear, or null to clear all
+     */
+    public function clearRateLimiter(?string $key = null): void
+    {
+        // Check if rate limiter supports clearing
+        if (method_exists($this->rate_limiter, 'clear')) {
+            $this->rate_limiter->clear($key);
+        }
     }
 }
