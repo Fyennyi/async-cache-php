@@ -41,4 +41,14 @@ class InMemoryRateLimiter implements RateLimiterInterface
     {
         $this->last_execution_time[$key] = microtime(true);
     }
+
+    public function clear(?string $key = null) : void
+    {
+        if ($key === null) {
+            $this->last_execution_time = [];
+            $this->intervals = [];
+        } else {
+            unset($this->last_execution_time[$key], $this->intervals[$key]);
+        }
+    }
 }
