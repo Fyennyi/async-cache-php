@@ -23,6 +23,7 @@ class CacheOptions
         public bool $compression = false,
         public int $compression_threshold = 1024,
         public bool $fail_safe = true,
+        public float $x_fetch_beta = 1.0,
         public ?string $rate_limit_key = null,
         public bool $force_refresh = false
     ) {
