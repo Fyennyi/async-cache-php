@@ -4,6 +4,8 @@ namespace Fyennyi\AsyncCache\Storage;
 
 use Fyennyi\AsyncCache\CacheOptions;
 use Fyennyi\AsyncCache\Model\CachedItem;
+use Fyennyi\AsyncCache\Serializer\PhpSerializer;
+use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
 
@@ -13,11 +15,14 @@ use Psr\SimpleCache\CacheInterface;
 class CacheStorage
 {
     private const TAG_PREFIX = 'tag_v:';
+    private SerializerInterface $serializer;
 
     public function __construct(
         private CacheInterface $adapter,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
+        ?SerializerInterface $serializer = null
     ) {
+        $this->serializer = $serializer ?? new PhpSerializer();
     }
 
     /**
@@ -41,23 +46,22 @@ class CacheStorage
                 return null;
             }
 
-            // --- Tag Validation Start ---
+            // Tag Validation
             if (!empty($cached_item->tagVersions)) {
                 $currentVersions = $this->getTagVersions(array_keys($cached_item->tagVersions));
                 foreach ($cached_item->tagVersions as $tag => $savedVersion) {
                     if (($currentVersions[$tag] ?? null) !== $savedVersion) {
                         $this->logger->debug('AsyncCache TAG_INVALID: tag version mismatch', ['key' => $key, 'tag' => $tag]);
-                        return null; // Tag invalidated
+                        return null; 
                     }
                 }
             }
-            // --- Tag Validation End ---
 
             // Handle decompression
             if ($cached_item->isCompressed && is_string($cached_item->data)) {
                 $decompressed_data = @gzuncompress($cached_item->data);
                 if ($decompressed_data !== false) {
-                    $data = unserialize($decompressed_data);
+                    $data = $this->serializer->unserialize($decompressed_data);
                     return new CachedItem(
                         data: $data,
                         logicalExpireTime: $cached_item->logicalExpireTime,
@@ -103,7 +107,7 @@ class CacheStorage
             }
 
             if ($options->compression) {
-                $serialized_data = serialize($data);
+                $serialized_data = $this->serializer->serialize($data);
                 if (strlen($serialized_data) >= $options->compression_threshold) {
                     $compressed_data = @gzcompress($serialized_data);
                     if ($compressed_data !== false) {
@@ -164,7 +168,7 @@ class CacheStorage
             $version = $rawVersions[self::TAG_PREFIX . $tag] ?? null;
             if ($version === null && $createMissing) {
                 $version = $this->generateVersion();
-                $this->adapter->set(self::TAG_PREFIX . $tag, $version, 86400 * 30); // 30 days
+                $this->adapter->set(self::TAG_PREFIX . $tag, $version, 86400 * 30); 
             }
             $versions[$tag] = (string) $version;
         }
