@@ -10,6 +10,7 @@ use Fyennyi\AsyncCache\Lock\LockInterface;
 use Fyennyi\AsyncCache\Middleware\MiddlewareInterface;
 use Fyennyi\AsyncCache\RateLimiter\RateLimiterFactory;
 use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
+use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use GuzzleHttp\Promise\PromiseInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
@@ -31,6 +32,7 @@ class AsyncCacheManager
      * @param  LockInterface|null  $lock_provider  The distributed lock provider
      * @param  MiddlewareInterface[]  $middlewares  Optional middleware stack
      * @param  EventDispatcherInterface|null  $dispatcher  The PSR-14 event dispatcher
+     * @param  SerializerInterface|null  $serializer  The custom serializer
      */
     public function __construct(
         private CacheInterface $cache_adapter,
@@ -39,11 +41,12 @@ class AsyncCacheManager
         private ?LoggerInterface $logger = null,
         private ?LockInterface $lock_provider = null,
         array $middlewares = [],
-        private ?EventDispatcherInterface $dispatcher = null
+        private ?EventDispatcherInterface $dispatcher = null,
+        ?SerializerInterface $serializer = null
     ) {
         $this->logger = $this->logger ?? new NullLogger();
         
-        $this->storage = new CacheStorage($this->cache_adapter, $this->logger);
+        $this->storage = new CacheStorage($this->cache_adapter, $this->logger, $serializer);
         $this->lock_provider = $this->lock_provider ?? new InMemoryLockAdapter();
 
         if ($this->rate_limiter === null) {
