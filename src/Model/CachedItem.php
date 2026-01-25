@@ -10,7 +10,8 @@ class CachedItem
     public function __construct(
         public readonly mixed $data,
         public readonly int $logicalExpireTime,
-        public readonly int $version = 1
+        public readonly int $version = 1,
+        public readonly bool $isCompressed = false
     ) {
     }
 
