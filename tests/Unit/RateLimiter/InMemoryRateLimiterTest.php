@@ -36,7 +36,7 @@ class InMemoryRateLimiterTest extends TestCase
 
         $this->assertFalse($limiter->isLimited('test_key'));
     }
-    
+
     public function testIndependentKeys() : void
     {
         $limiter = new InMemoryRateLimiter();
