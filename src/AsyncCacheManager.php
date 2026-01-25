@@ -21,6 +21,7 @@ class AsyncCacheManager
 {
     private CacheResolver $resolver;
     private Pipeline $pipeline;
+    private CacheStorage $storage;
 
     /**
      * @param  CacheInterface  $cache_adapter  The PSR-16 cache implementation
@@ -42,7 +43,7 @@ class AsyncCacheManager
     ) {
         $this->logger = $this->logger ?? new NullLogger();
         
-        $storage = new CacheStorage($this->cache_adapter, $this->logger);
+        $this->storage = new CacheStorage($this->cache_adapter, $this->logger);
         $this->lock_provider = $this->lock_provider ?? new InMemoryLockAdapter();
 
         if ($this->rate_limiter === null) {
@@ -50,7 +51,7 @@ class AsyncCacheManager
         }
 
         $this->resolver = new CacheResolver(
-            $storage,
+            $this->storage,
             $this->rate_limiter,
             $this->lock_provider,
             $this->logger,
@@ -68,6 +69,14 @@ class AsyncCacheManager
         return $this->pipeline->send($key, $promise_factory, $options, function ($k, $f, $o) {
             return $this->resolver->resolve($k, $f, $o);
         });
+    }
+
+    /**
+     * Invalidates all cache entries associated with the given tags
+     */
+    public function invalidateTags(array $tags) : void
+    {
+        $this->storage->invalidateTags($tags);
     }
 
     /**
