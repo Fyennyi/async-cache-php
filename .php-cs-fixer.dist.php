@@ -11,6 +11,8 @@ return $config->setRules([
     'no_whitespace_in_blank_line' => true,
     'no_trailing_whitespace' => true,
     'no_unused_imports' => true,
+    'single_blank_line_at_eof' => true,
 ])
+    ->setLineEnding("\n")
     ->setFinder($finder)
 ;
