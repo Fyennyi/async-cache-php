@@ -12,6 +12,7 @@ use Fyennyi\AsyncCache\RateLimiter\RateLimiterFactory;
 use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
+use GuzzleHttp\Promise\Create;
 use GuzzleHttp\Promise\PromiseInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
@@ -72,6 +73,46 @@ class AsyncCacheManager
         return $this->pipeline->send($key, $promise_factory, $options, function ($k, $f, $o) {
             return $this->resolver->resolve($k, $f, $o);
         });
+    }
+
+    /**
+     * Atomically increments a cached integer value
+     * 
+     * @return PromiseInterface<int>
+     */
+    public function increment(string $key, int $step = 1, ?CacheOptions $options = null): PromiseInterface
+    {
+        $options = $options ?? new CacheOptions();
+        $lockKey = 'lock:counter:' . $key;
+
+        try {
+            // Acquire blocking lock to ensure atomicity
+            if ($this->lock_provider->acquire($lockKey, 10.0, true)) {
+                $item = $this->storage->get($key, $options);
+                $currentValue = $item ? (int) $item->data : 0;
+                $newValue = $currentValue + $step;
+                
+                $this->storage->set($key, $newValue, $options);
+                $this->lock_provider->release($lockKey);
+                
+                return Create::promiseFor($newValue);
+            }
+            
+            return Create::rejectionFor(new \RuntimeException("Could not acquire lock for incrementing key: $key"));
+        } catch (\Throwable $e) {
+            $this->lock_provider->release($lockKey);
+            return Create::rejectionFor($e);
+        }
+    }
+
+    /**
+     * Atomically decrements a cached integer value
+     * 
+     * @return PromiseInterface<int>
+     */
+    public function decrement(string $key, int $step = 1, ?CacheOptions $options = null): PromiseInterface
+    {
+        return $this->increment($key, -$step, $options);
     }
 
     /**
