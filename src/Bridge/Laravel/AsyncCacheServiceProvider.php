@@ -5,8 +5,8 @@ namespace Fyennyi\AsyncCache\Bridge\Laravel;
 use Fyennyi\AsyncCache\AsyncCacheManager;
 use Fyennyi\AsyncCache\Enum\RateLimiterType;
 use Illuminate\Support\ServiceProvider;
-use Psr\SimpleCache\CacheInterface;
 use Psr\Log\LoggerInterface;
+use Psr\SimpleCache\CacheInterface;
 
 /**
  * Service Provider for Laravel integration

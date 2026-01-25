@@ -3,16 +3,16 @@
 namespace Fyennyi\AsyncCache\Core;
 
 use Fyennyi\AsyncCache\CacheOptions;
-use Fyennyi\AsyncCache\Enum\CacheStrategy;
 use Fyennyi\AsyncCache\Enum\CacheStatus;
-use Fyennyi\AsyncCache\Exception\RateLimitException;
-use Fyennyi\AsyncCache\Model\CachedItem;
-use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
-use Fyennyi\AsyncCache\Storage\CacheStorage;
-use Fyennyi\AsyncCache\Lock\LockInterface;
+use Fyennyi\AsyncCache\Enum\CacheStrategy;
 use Fyennyi\AsyncCache\Event\CacheHitEvent;
 use Fyennyi\AsyncCache\Event\CacheMissEvent;
 use Fyennyi\AsyncCache\Event\RateLimitExceededEvent;
+use Fyennyi\AsyncCache\Exception\RateLimitException;
+use Fyennyi\AsyncCache\Lock\LockInterface;
+use Fyennyi\AsyncCache\Model\CachedItem;
+use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
+use Fyennyi\AsyncCache\Storage\CacheStorage;
 use GuzzleHttp\Promise\Create;
 use GuzzleHttp\Promise\PromiseInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;

@@ -4,14 +4,14 @@ namespace Fyennyi\AsyncCache\Bridge\Symfony\DependencyInjection;
 
 use Fyennyi\AsyncCache\AsyncCacheManager;
 use Fyennyi\AsyncCache\Enum\RateLimiterType;
+use Fyennyi\AsyncCache\Lock\LockInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
+use Psr\Log\LoggerInterface;
+use Psr\SimpleCache\CacheInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Reference;
-use Psr\SimpleCache\CacheInterface;
-use Psr\Log\LoggerInterface;
-use Psr\EventDispatcher\EventDispatcherInterface;
-use Fyennyi\AsyncCache\Lock\LockInterface;
 
 class AsyncCacheExtension extends Extension
 {
