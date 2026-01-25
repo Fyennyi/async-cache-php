@@ -9,6 +9,7 @@ use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use Fyennyi\AsyncCache\Lock\LockInterface;
 use Fyennyi\AsyncCache\Lock\InMemoryLockAdapter;
+use Fyennyi\AsyncCache\Middleware\MiddlewareInterface;
 use GuzzleHttp\Promise\Create;
 use GuzzleHttp\Promise\PromiseInterface;
 use Psr\Log\LoggerInterface;
@@ -21,6 +22,9 @@ class AsyncCacheManager
     private array $pending_promises = [];
 
     private CacheStorage $storage;
+    
+    /** @var MiddlewareInterface[] */
+    private array $middlewares = [];
 
     /**
      * @param  CacheInterface  $cache_adapter  The PSR-16 cache implementation
@@ -28,17 +32,20 @@ class AsyncCacheManager
      * @param  string  $rate_limiter_type  Type of rate limiter to use
      * @param  LoggerInterface|null  $logger  The PSR-3 logger implementation
      * @param  LockInterface|null  $lock_provider  The distributed lock provider
+     * @param  MiddlewareInterface[]  $middlewares  Optional middleware stack
      */
     public function __construct(
         private CacheInterface $cache_adapter,
         private ?RateLimiterInterface $rate_limiter = null,
         private string $rate_limiter_type = 'auto',
         private ?LoggerInterface $logger = null,
-        private ?LockInterface $lock_provider = null
+        private ?LockInterface $lock_provider = null,
+        array $middlewares = []
     ) {
         $this->logger = $this->logger ?? new NullLogger();
         $this->storage = new CacheStorage($this->cache_adapter, $this->logger);
         $this->lock_provider = $this->lock_provider ?? new InMemoryLockAdapter();
+        $this->middlewares = $middlewares;
 
         if ($this->rate_limiter === null) {
             $this->rate_limiter = match ($this->rate_limiter_type) {
@@ -55,6 +62,27 @@ class AsyncCacheManager
      */
     public function wrap(string $key, callable $promise_factory, CacheOptions $options) : PromiseInterface
     {
+        if (empty($this->middlewares)) {
+            return $this->processWrap($key, $promise_factory, $options);
+        }
+
+        // Build middleware chain
+        $pipeline = array_reverse($this->middlewares);
+        $next = fn(string $k, callable $f, CacheOptions $o) => $this->processWrap($k, $f, $o);
+
+        foreach ($pipeline as $middleware) {
+            $currentNext = $next;
+            $next = fn(string $k, callable $f, CacheOptions $o) => $middleware->handle($k, $f, $o, $currentNext);
+        }
+
+        return $next($key, $promise_factory, $options);
+    }
+
+    /**
+     * Core logic of wrapping (formerly wrap)
+     */
+    private function processWrap(string $key, callable $promise_factory, CacheOptions $options) : PromiseInterface
+    {
         // 1. Try to fetch from cache first
         $cached_item = null;
         if (! $options->force_refresh) {
@@ -67,7 +95,6 @@ class AsyncCacheManager
 
             // Probabilistic Early Expiration (X-Fetch)
             if ($is_fresh && $options->x_fetch_beta > 0 && $cached_item->generationTime > 0) {
-                // Formula: T - (gap * beta * log(rand())) > expiry
                 $rand = mt_rand(1, mt_getrandmax()) / mt_getrandmax();
                 $check = time() - ($cached_item->generationTime * $options->x_fetch_beta * log($rand));
                 
@@ -102,13 +129,11 @@ class AsyncCacheManager
      */
     private function fetch(string $key, callable $promise_factory, CacheOptions $options, ?CachedItem $stale_item = null) : PromiseInterface
     {
-        // 1. Local Promise Coalescing (within this process)
         if (isset($this->pending_promises[$key])) {
             $this->logger->info('AsyncCache COALESCE: reusing pending promise', ['key' => $key]);
             return $this->pending_promises[$key];
         }
 
-        // 2. Distributed Locking (between multiple servers/processes)
         $lock_key = 'lock:' . $key;
         if (! $this->lock_provider->acquire($lock_key, 30.0, false)) {
             if ($stale_item !== null) {
@@ -125,7 +150,6 @@ class AsyncCacheManager
             $is_rate_limited = $this->rate_limiter->isLimited($options->rate_limit_key);
         }
 
-        // Stale Fallback Strategy (Rate Limited)
         if ($is_rate_limited) {
             $this->lock_provider->release($lock_key);
             if ($options->serve_stale_if_limited && $stale_item !== null) {
@@ -164,7 +188,7 @@ class AsyncCacheManager
     }
 
     /**
-     * Proxy methods for cache operations
+     * Proxy methods
      */
     public function clear() : bool { return $this->storage->clear(); }
     public function delete(string $key) : bool { return $this->storage->delete($key); }
