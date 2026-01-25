@@ -10,25 +10,25 @@ class InMemoryRateLimiter implements RateLimiterInterface
     /** @var array<string, int> */
     private array $intervals = [];
 
-    public function configure(string $key, int $seconds): void
+    public function configure(string $key, int $seconds) : void
     {
         $this->intervals[$key] = $seconds;
     }
 
-    public function isLimited(string $key): bool
+    public function isLimited(string $key) : bool
     {
-        if (!isset($this->intervals[$key])) {
+        if (! isset($this->intervals[$key])) {
             return false;
         }
 
         $interval = $this->intervals[$key];
-        
+
         // If interval is 0, we consider it disabled (unlimited)
         if ($interval === 0) {
             return false;
         }
 
-        if (!isset($this->last_execution_time[$key])) {
+        if (! isset($this->last_execution_time[$key])) {
             return false;
         }
 
@@ -37,7 +37,7 @@ class InMemoryRateLimiter implements RateLimiterInterface
         return $elapsed < $interval;
     }
 
-    public function recordExecution(string $key): void
+    public function recordExecution(string $key) : void
     {
         $this->last_execution_time[$key] = microtime(true);
     }

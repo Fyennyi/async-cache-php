@@ -38,7 +38,7 @@ class AsyncCacheManager
     {
         // 1. Try to fetch from cache first
         $cached_item = null;
-        if (!$options->force_refresh) {
+        if (! $options->force_refresh) {
             $cached_item = $this->cache_adapter->get($key);
         }
 
@@ -119,7 +119,7 @@ class AsyncCacheManager
      *
      * @return bool True on success and false on failure
      */
-    public function clear(): bool
+    public function clear() : bool
     {
         return $this->cache_adapter->clear();
     }
@@ -130,7 +130,7 @@ class AsyncCacheManager
      * @param  string  $key  The unique cache key of the item to delete
      * @return bool True if the item was successfully removed, false if there was an error
      */
-    public function delete(string $key): bool
+    public function delete(string $key) : bool
     {
         return $this->cache_adapter->delete($key);
     }
