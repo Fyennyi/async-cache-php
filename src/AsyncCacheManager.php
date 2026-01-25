@@ -63,7 +63,24 @@ class AsyncCacheManager
 
         // 2. Check if cache is fresh (Hit)
         if ($cached_item instanceof CachedItem) {
-            if ($cached_item->isFresh()) {
+            $is_fresh = $cached_item->isFresh();
+
+            // Probabilistic Early Expiration (X-Fetch)
+            if ($is_fresh && $options->x_fetch_beta > 0 && $cached_item->generationTime > 0) {
+                // Formula: T - (gap * beta * log(rand())) > expiry
+                $rand = mt_rand(1, mt_getrandmax()) / mt_getrandmax();
+                $check = time() - ($cached_item->generationTime * $options->x_fetch_beta * log($rand));
+                
+                if ($check > $cached_item->logicalExpireTime) {
+                    $this->logger->info('AsyncCache X-FETCH: probabilistic early expiration triggered', [
+                        'key' => $key,
+                        'ttl_left' => $cached_item->logicalExpireTime - time()
+                    ]);
+                    $is_fresh = false;
+                }
+            }
+
+            if ($is_fresh) {
                 $this->logger->debug('AsyncCache HIT: fresh data returned', ['key' => $key]);
                 return Create::promiseFor($cached_item->data);
             }
@@ -92,14 +109,12 @@ class AsyncCacheManager
         }
 
         // 2. Distributed Locking (between multiple servers/processes)
-        // We use a non-blocking lock attempt. If someone else is fetching, we use stale data.
         $lock_key = 'lock:' . $key;
         if (! $this->lock_provider->acquire($lock_key, 30.0, false)) {
             if ($stale_item !== null) {
                 $this->logger->info('AsyncCache LOCK_BUSY: another process is fetching, serving stale data', ['key' => $key]);
                 return Create::promiseFor($stale_item->data);
             }
-            // If no stale data and lock busy, we wait or fail. For now, we try to get lock with short block.
             if (! $this->lock_provider->acquire($lock_key, 30.0, true)) {
                 return Create::rejectionFor(new \RuntimeException("Could not acquire lock for key: $key"));
             }
@@ -125,11 +140,13 @@ class AsyncCacheManager
             $this->rate_limiter->recordExecution($options->rate_limit_key);
         }
 
+        $start_time = microtime(true);
         $promise = $promise_factory()->then(
-            function ($data) use ($key, $options, $lock_key) {
+            function ($data) use ($key, $options, $lock_key, $start_time) {
+                $generation_time = microtime(true) - $start_time;
                 unset($this->pending_promises[$key]);
                 $this->lock_provider->release($lock_key);
-                $this->storage->set($key, $data, $options);
+                $this->storage->set($key, $data, $options, $generation_time);
                 return $data;
             },
             function ($reason) use ($key, $lock_key) {
