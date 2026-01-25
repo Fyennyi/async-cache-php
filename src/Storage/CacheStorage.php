@@ -12,6 +12,8 @@ use Psr\SimpleCache\CacheInterface;
  */
 class CacheStorage
 {
+    private const TAG_PREFIX = 'tag_v:';
+
     public function __construct(
         private CacheInterface $adapter,
         private LoggerInterface $logger
@@ -19,7 +21,7 @@ class CacheStorage
     }
 
     /**
-     * Retrieves an item from the cache, handles fail-safe and decompression
+     * Retrieves an item from the cache, handles fail-safe, decompression and tag validation
      */
     public function get(string $key, CacheOptions $options): ?CachedItem
     {
@@ -39,6 +41,18 @@ class CacheStorage
                 return null;
             }
 
+            // --- Tag Validation Start ---
+            if (!empty($cached_item->tagVersions)) {
+                $currentVersions = $this->getTagVersions(array_keys($cached_item->tagVersions));
+                foreach ($cached_item->tagVersions as $tag => $savedVersion) {
+                    if (($currentVersions[$tag] ?? null) !== $savedVersion) {
+                        $this->logger->debug('AsyncCache TAG_INVALID: tag version mismatch', ['key' => $key, 'tag' => $tag]);
+                        return null; // Tag invalidated
+                    }
+                }
+            }
+            // --- Tag Validation End ---
+
             // Handle decompression
             if ($cached_item->isCompressed && is_string($cached_item->data)) {
                 $decompressed_data = @gzuncompress($cached_item->data);
@@ -49,7 +63,8 @@ class CacheStorage
                         logicalExpireTime: $cached_item->logicalExpireTime,
                         version: $cached_item->version,
                         isCompressed: false,
-                        generationTime: $cached_item->generationTime
+                        generationTime: $cached_item->generationTime,
+                        tagVersions: $cached_item->tagVersions
                     );
                 }
                 
@@ -72,7 +87,7 @@ class CacheStorage
     }
 
     /**
-     * Stores an item in the cache, handles compression and fail-safe
+     * Stores an item in the cache, handles compression, fail-safe and tags
      */
     public function set(string $key, mixed $data, CacheOptions $options, float $generationTime = 0.0): bool
     {
@@ -81,6 +96,12 @@ class CacheStorage
             $physical_ttl = $logical_ttl + $options->stale_grace_period;
             $is_compressed = false;
 
+            // Fetch current tag versions
+            $tagVersions = [];
+            if (!empty($options->tags)) {
+                $tagVersions = $this->getTagVersions($options->tags, true);
+            }
+
             if ($options->compression) {
                 $serialized_data = serialize($data);
                 if (strlen($serialized_data) >= $options->compression_threshold) {
@@ -88,11 +109,6 @@ class CacheStorage
                     if ($compressed_data !== false) {
                         $data = $compressed_data;
                         $is_compressed = true;
-                        $this->logger->debug('AsyncCache COMPRESSION: data compressed', [
-                            'key' => $key,
-                            'original_size' => strlen($serialized_data),
-                            'compressed_size' => strlen($compressed_data)
-                        ]);
                     }
                 }
             }
@@ -101,7 +117,8 @@ class CacheStorage
                 data: $data,
                 logicalExpireTime: time() + $logical_ttl,
                 isCompressed: $is_compressed,
-                generationTime: $generationTime
+                generationTime: $generationTime,
+                tagVersions: $tagVersions
             );
 
             return $this->adapter->set($key, $item, $physical_ttl);
@@ -119,8 +136,42 @@ class CacheStorage
     }
 
     /**
-     * Proxy methods for simple operations
+     * Invalidates specific tags by changing their versions
      */
+    public function invalidateTags(array $tags): void
+    {
+        foreach ($tags as $tag) {
+            $this->adapter->set(self::TAG_PREFIX . $tag, $this->generateVersion());
+        }
+        $this->logger->info('AsyncCache TAGS_INVALIDATED', ['tags' => $tags]);
+    }
+
+    /**
+     * Fetches current versions for a set of tags
+     */
+    private function getTagVersions(array $tags, bool $createMissing = false): array
+    {
+        $keys = array_map(fn($t) => self::TAG_PREFIX . $t, $tags);
+        $rawVersions = $this->adapter->getMultiple($keys);
+        
+        $versions = [];
+        foreach ($tags as $tag) {
+            $version = $rawVersions[self::TAG_PREFIX . $tag] ?? null;
+            if ($version === null && $createMissing) {
+                $version = $this->generateVersion();
+                $this->adapter->set(self::TAG_PREFIX . $tag, $version, 86400 * 30); // 30 days
+            }
+            $versions[$tag] = (string) $version;
+        }
+
+        return $versions;
+    }
+
+    private function generateVersion(): string
+    {
+        return uniqid('', true);
+    }
+
     public function delete(string $key): bool { return $this->adapter->delete($key); }
     public function clear(): bool { return $this->adapter->clear(); }
     public function getAdapter(): CacheInterface { return $this->adapter; }
