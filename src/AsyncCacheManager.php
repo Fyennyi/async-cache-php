@@ -3,9 +3,9 @@
 namespace Fyennyi\AsyncCache;
 
 use Fyennyi\AsyncCache\Exception\RateLimitException;
-use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
-use Fyennyi\AsyncCache\RateLimiter\RateLimiterFactory;
 use Fyennyi\AsyncCache\Model\CachedItem;
+use Fyennyi\AsyncCache\RateLimiter\RateLimiterFactory;
+use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
 use GuzzleHttp\Promise\Create;
 use GuzzleHttp\Promise\PromiseInterface;
 use Psr\SimpleCache\CacheInterface;
