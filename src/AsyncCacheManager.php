@@ -51,7 +51,7 @@ class AsyncCacheManager
         // 2. Check if cache is fresh (Hit)
         if ($cached_item !== null) {
             // Backward compatibility: handle old array format
-            if (is_array($cached_item) && isset($cached_item['d'], $cached_item['e'])) {
+            if (is_array($cached_item) && array_key_exists('d', $cached_item) && array_key_exists('e', $cached_item)) {
                 $cached_item = new CachedItem($cached_item['d'], $cached_item['e']);
             }
 
