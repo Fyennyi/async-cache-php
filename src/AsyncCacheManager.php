@@ -14,6 +14,9 @@ use Psr\SimpleCache\CacheInterface;
 
 class AsyncCacheManager
 {
+    /** @var array<string, PromiseInterface> */
+    private array $pending_promises = [];
+
     /**
      * @param  CacheInterface  $cache_adapter  The PSR-16 cache implementation
      * @param  RateLimiterInterface|null  $rate_limiter  The rate limiter implementation
@@ -68,6 +71,14 @@ class AsyncCacheManager
         }
 
         // 3. Cache is missed or stale (Expired). We need to decide whether to fetch or use stale.
+        
+        // --- Promise Coalescing Start ---
+        if (isset($this->pending_promises[$key])) {
+            $this->logger->info('AsyncCache COALESCE: reusing pending promise', ['key' => $key]);
+            return $this->pending_promises[$key];
+        }
+        // --- Promise Coalescing End ---
+
         $is_rate_limited = false;
         if ($options->rate_limit_key) {
             $is_rate_limited = $this->rate_limiter->isLimited($options->rate_limit_key);
@@ -96,12 +107,14 @@ class AsyncCacheManager
             $this->rate_limiter->recordExecution($options->rate_limit_key);
         }
 
-        return $promise_factory()->then(
+        $promise = $promise_factory()->then(
             function ($data) use ($key, $options) {
+                unset($this->pending_promises[$key]);
                 $this->storeInCache($key, $data, $options);
                 return $data;
             },
             function ($reason) use ($key) {
+                unset($this->pending_promises[$key]);
                 $this->logger->error('AsyncCache FETCH_ERROR: failed to fetch fresh data', [
                     'key' => $key,
                     'reason' => $reason
@@ -109,6 +122,8 @@ class AsyncCacheManager
                 throw $reason;
             }
         );
+
+        return $this->pending_promises[$key] = $promise;
     }
 
     /**
