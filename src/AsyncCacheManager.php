@@ -11,7 +11,9 @@ use Fyennyi\AsyncCache\Lock\InMemoryLockAdapter;
 use Fyennyi\AsyncCache\Lock\LockInterface;
 use Fyennyi\AsyncCache\Middleware\AsyncLockMiddleware;
 use Fyennyi\AsyncCache\Middleware\CacheLookupMiddleware;
+use Fyennyi\AsyncCache\Middleware\CoalesceMiddleware;
 use Fyennyi\AsyncCache\Middleware\SourceFetchMiddleware;
+use Fyennyi\AsyncCache\Middleware\StaleOnErrorMiddleware;
 use Fyennyi\AsyncCache\RateLimiter\RateLimiterFactory;
 use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
@@ -21,11 +23,11 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
 use GuzzleHttp\Promise\PromiseInterface as GuzzlePromiseInterface;
+use React\Promise\PromiseInterface as ReactPromiseInterface;
 use function React\Async\await;
 
 /**
- * High-performance Asynchronous Cache Manager.
- * Uses a custom Future core with built-in bridges for Guzzle, ReactPHP and Fibers.
+ * Universal Asynchronous Cache Manager powered by native Futures.
  */
 class AsyncCacheManager
 {
@@ -52,6 +54,8 @@ class AsyncCacheManager
 
         if (empty($middlewares)) {
             $middlewares = [
+                new CoalesceMiddleware(),
+                new StaleOnErrorMiddleware($this->logger, $this->dispatcher),
                 new CacheLookupMiddleware($this->storage, $this->logger, $this->dispatcher),
                 new AsyncLockMiddleware($this->lock_provider, $this->storage, $this->logger, $this->dispatcher),
                 new SourceFetchMiddleware($this->storage, $this->logger, $this->dispatcher)
@@ -62,7 +66,7 @@ class AsyncCacheManager
     }
 
     /**
-     * Internal logic returns a Future object.
+     * Internal core method. Returns native Future.
      */
     public function wrapFuture(string $key, callable $promise_factory, CacheOptions $options): Future
     {
@@ -91,7 +95,7 @@ class AsyncCacheManager
     /**
      * ReactPHP API: Returns a native ReactPHP Promise (Performance)
      */
-    public function wrapReact(string $key, callable $promise_factory, CacheOptions $options): \React\Promise\PromiseInterface
+    public function wrapReact(string $key, callable $promise_factory, CacheOptions $options): ReactPromiseInterface
     {
         return $this->wrapFuture($key, $promise_factory, $options)->toReact();
     }
