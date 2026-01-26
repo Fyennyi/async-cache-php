@@ -3,7 +3,6 @@
 namespace Fyennyi\AsyncCache\Bridge\Laravel;
 
 use Fyennyi\AsyncCache\AsyncCacheManager;
-use Fyennyi\AsyncCache\Enum\RateLimiterType;
 use Illuminate\Support\ServiceProvider;
 use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
@@ -24,7 +23,6 @@ class AsyncCacheServiceProvider extends ServiceProvider
             // Laravel automatically provides implementations for CacheInterface and LoggerInterface
             return new AsyncCacheManager(
                 cache_adapter: $app->make(CacheInterface::class),
-                rate_limiter_type: RateLimiterType::from(config('async-cache.rate_limiter_type', 'auto')),
                 logger: $app->make(LoggerInterface::class)
             );
         });

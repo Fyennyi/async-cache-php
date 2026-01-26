@@ -3,7 +3,6 @@
 namespace Fyennyi\AsyncCache\Bridge\Symfony\DependencyInjection;
 
 use Fyennyi\AsyncCache\AsyncCacheManager;
-use Fyennyi\AsyncCache\Enum\RateLimiterType;
 use Fyennyi\AsyncCache\Lock\LockInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
@@ -33,13 +32,12 @@ class AsyncCacheExtension extends Extension
         $definition = new Definition(AsyncCacheManager::class);
 
         $definition->setArguments([
-            new Reference(CacheInterface::class),
-            null, // rate_limiter (null triggers factory)
-            RateLimiterType::from($config['rate_limiter_type']),
-            new Reference(LoggerInterface::class),
-            new Reference(LockInterface::class),
-            [], // middlewares
-            new Reference(EventDispatcherInterface::class)
+            '$cache_adapter' => new Reference(CacheInterface::class),
+            '$rate_limiter' => null, // Expects explicit configuration if needed
+            '$logger' => new Reference(LoggerInterface::class),
+            '$lock_provider' => new Reference(LockInterface::class),
+            '$middlewares' => [],
+            '$dispatcher' => new Reference(EventDispatcherInterface::class)
         ]);
 
         $definition->setPublic(true);

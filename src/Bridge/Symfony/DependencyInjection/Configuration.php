@@ -14,13 +14,6 @@ class Configuration implements ConfigurationInterface
 
         $rootNode
             ->children()
-                ->scalarNode('rate_limiter_type')
-                    ->defaultValue('auto')
-                    ->validate()
-                        ->ifNotInArray(['auto', 'symfony', 'in_memory'])
-                        ->thenInvalid('Invalid rate limiter type %s')
-                    ->end()
-                ->end()
                 ->scalarNode('default_strategy')
                     ->defaultValue('strict')
                 ->end()

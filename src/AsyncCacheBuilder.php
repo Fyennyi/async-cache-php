@@ -2,22 +2,20 @@
 
 namespace Fyennyi\AsyncCache;
 
-use Fyennyi\AsyncCache\Enum\RateLimiterType;
 use Fyennyi\AsyncCache\Lock\LockInterface;
 use Fyennyi\AsyncCache\Middleware\MiddlewareInterface;
-use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
+use Symfony\Component\RateLimiter\LimiterInterface;
 
 /**
  * Fluent builder for AsyncCacheManager focused on ReactPHP and Fibers
  */
 class AsyncCacheBuilder
 {
-    private ?RateLimiterInterface $rateLimiter = null;
-    private RateLimiterType $rateLimiterType = RateLimiterType::Auto;
+    private ?LimiterInterface $rateLimiter = null;
     private ?LoggerInterface $logger = null;
     private ?LockInterface $lockProvider = null;
     /** @var MiddlewareInterface[] */
@@ -44,26 +42,14 @@ class AsyncCacheBuilder
     }
 
     /**
-     * Sets a custom rate limiter implementation
+     * Sets a custom Symfony Rate Limiter implementation
      *
-     * @param  RateLimiterInterface  $rateLimiter  The implementation to use
-     * @return self                                Current builder instance
+     * @param  LimiterInterface  $rateLimiter  The implementation to use
+     * @return self                            Current builder instance
      */
-    public function withRateLimiter(RateLimiterInterface $rateLimiter) : self
+    public function withRateLimiter(LimiterInterface $rateLimiter) : self
     {
         $this->rateLimiter = $rateLimiter;
-        return $this;
-    }
-
-    /**
-     * Configures the automatic rate limiter type
-     *
-     * @param  RateLimiterType  $type  Enum identifier for the rate limiter
-     * @return self                    Current builder instance
-     */
-    public function withRateLimiterType(RateLimiterType $type) : self
-    {
-        $this->rateLimiterType = $type;
         return $this;
     }
 
@@ -137,7 +123,6 @@ class AsyncCacheBuilder
         return new AsyncCacheManager(
             $this->cacheAdapter,
             $this->rateLimiter,
-            $this->rateLimiterType,
             $this->logger,
             $this->lockProvider,
             $this->middlewares,
