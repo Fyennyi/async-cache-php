@@ -3,7 +3,7 @@
 namespace Fyennyi\AsyncCache\Core;
 
 use Fyennyi\AsyncCache\Middleware\MiddlewareInterface;
-use GuzzleHttp\Promise\PromiseInterface;
+use React\Promise\PromiseInterface;
 
 /**
  * Orchestrates the execution of middleware stack
