@@ -9,5 +9,6 @@ enum RateLimiterType: string
 {
     case Symfony = 'symfony';
     case InMemory = 'in_memory';
+    case TokenBucket = 'token_bucket';
     case Auto = 'auto';
 }
