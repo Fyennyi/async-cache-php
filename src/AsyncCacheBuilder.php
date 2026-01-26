@@ -2,10 +2,11 @@
 
 namespace Fyennyi\AsyncCache;
 
-use Fyennyi\AsyncCache\Enum\RateLimiterType;
-use Fyennyi\AsyncCache\Lock\LockInterface;
 use Fyennyi\AsyncCache\Middleware\MiddlewareInterface;
 use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
+use Fyennyi\AsyncCache\Enum\RateLimiterType;
+use Fyennyi\AsyncCache\Lock\LockInterface;
+use Fyennyi\AsyncCache\Runtime\RuntimeInterface;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
@@ -24,6 +25,7 @@ class AsyncCacheBuilder
     private array $middlewares = [];
     private ?EventDispatcherInterface $dispatcher = null;
     private ?SerializerInterface $serializer = null;
+    private ?RuntimeInterface $runtime = null;
 
     public function __construct(private CacheInterface $cacheAdapter)
     {
@@ -76,6 +78,12 @@ class AsyncCacheBuilder
         return $this;
     }
 
+    public function withRuntime(RuntimeInterface $runtime): self
+    {
+        $this->runtime = $runtime;
+        return $this;
+    }
+
     public function build(): AsyncCacheManager
     {
         return new AsyncCacheManager(
@@ -86,7 +94,8 @@ class AsyncCacheBuilder
             $this->lockProvider,
             $this->middlewares,
             $this->dispatcher,
-            $this->serializer
+            $this->serializer,
+            $this->runtime
         );
     }
 }
