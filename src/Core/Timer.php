@@ -2,7 +2,6 @@
 
 namespace Fyennyi\AsyncCache\Core;
 
-use React\Promise\Timer\resolve as reactDelay;
 
 /**
  * High-level timer for non-blocking asynchronous delays

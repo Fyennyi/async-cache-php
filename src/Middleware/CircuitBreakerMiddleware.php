@@ -54,7 +54,7 @@ class CircuitBreakerMiddleware implements MiddlewareInterface
 
             if (time() - $lastFailureTime < $this->retryTimeout) {
                 $this->logger->error('AsyncCache CIRCUIT_BREAKER: Open state, blocking request', ['key' => $context->key]);
-                
+
                 $deferred = new Deferred();
                 $deferred->reject(new \RuntimeException("Circuit Breaker is OPEN for key: {$context->key}"));
                 return $deferred->future();

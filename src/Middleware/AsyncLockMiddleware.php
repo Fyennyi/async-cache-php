@@ -61,7 +61,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
 
         $startTime = microtime(true);
         $timeout = 10.0;
-        
+
         // Create a master deferred that will eventually hold the result of the successful attempt
         $masterDeferred = new Deferred();
 
@@ -74,7 +74,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
                     $masterDeferred->resolve($cached_item->data);
                     return;
                 }
-                
+
                 // If acquired but no fresh cache, fetch via next middleware
                 $this->handleWithLock($context, $next, $lock_key)->onResolve(
                     fn($v) => $masterDeferred->resolve($v),
@@ -95,7 +95,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
         };
 
         $attempt();
-        
+
         return $masterDeferred->future();
     }
 
@@ -110,7 +110,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
     private function handleWithLock(CacheContext $context, callable $next, string $lock_key) : Future
     {
         $deferred = new Deferred();
-        
+
         $next($context)->onResolve(
             function ($data) use ($lock_key, $deferred) {
                 $this->lock_provider->release($lock_key);
@@ -121,7 +121,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
                 $deferred->reject($reason);
             }
         );
-        
+
         return $deferred->future();
     }
 }

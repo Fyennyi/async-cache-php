@@ -81,7 +81,7 @@ class AsyncCacheManager
     public function wrapFuture(string $key, callable $promise_factory, CacheOptions $options) : Future
     {
         $context = new CacheContext($key, $promise_factory, $options);
-        
+
         // Execute the pipeline. The result is a Future from the last middleware.
         return $this->pipeline->send($context, function (CacheContext $ctx) {
             $res = ($ctx->promiseFactory)();

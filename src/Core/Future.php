@@ -52,7 +52,7 @@ class Future
     /**
      * Synchronously waits for the value to arrive using ReactPHP await mechanism
      *
-     * @return mixed  The resolved value
+     * @return mixed The resolved value
      *
      * @throws \Throwable If the operation failed
      */

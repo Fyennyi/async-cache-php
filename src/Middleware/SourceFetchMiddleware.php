@@ -91,7 +91,7 @@ class SourceFetchMiddleware implements MiddlewareInterface
                     'key' => $context->key,
                     'reason' => $reason
                 ]);
-                
+
                 $finalDeferred->reject($reason instanceof \Throwable ? $reason : new \RuntimeException((string)$reason));
             }
         );
