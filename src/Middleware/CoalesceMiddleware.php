@@ -6,8 +6,8 @@ use Fyennyi\AsyncCache\Core\CacheContext;
 use Fyennyi\AsyncCache\Core\Future;
 
 /**
- * Implementation of the Singleflight (Request Coalescing) pattern.
- * Uses the passive Future container to share results among concurrent requests.
+ * Implementation of the Singleflight (Request Coalescing) pattern
+ * Uses the passive Future container to share results among concurrent requests
  */
 class CoalesceMiddleware implements MiddlewareInterface
 {

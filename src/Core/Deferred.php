@@ -3,8 +3,8 @@
 namespace Fyennyi\AsyncCache\Core;
 
 /**
- * Manages the resolution state of a Future.
- * Acts as the controller/producer side of the asynchronous operation.
+ * Manages the resolution state of a Future
+ * Acts as the controller/producer side of the asynchronous operation
  */
 class Deferred
 {
@@ -16,7 +16,7 @@ class Deferred
     }
 
     /**
-     * Returns the future controlled by this deferred.
+     * Returns the future controlled by this deferred
      *
      * @return Future
      */
@@ -26,7 +26,7 @@ class Deferred
     }
 
     /**
-     * Fulfills the future with a success value.
+     * Fulfills the future with a success value
      *
      * @param  mixed  $value  The result value
      * @return void
@@ -37,7 +37,7 @@ class Deferred
     }
 
     /**
-     * Rejects the future with a failure reason.
+     * Rejects the future with a failure reason
      *
      * @param  mixed  $reason  The failure reason
      * @return void

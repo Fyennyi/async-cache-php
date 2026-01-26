@@ -3,8 +3,8 @@
 namespace Fyennyi\AsyncCache\Core;
 
 /**
- * The internal "currency" of the library representing a value that will eventually be available.
- * Refactored to be a passive value placeholder (Container).
+ * The internal "currency" of the library representing a value that will eventually be available
+ * Refactored to be a passive value placeholder (Container)
  */
 class Future
 {
@@ -21,13 +21,13 @@ class Future
     private bool $isRejected = false;
 
     /**
-     * Internal constructor. Only Deferred should create instances.
+     * Internal constructor. Only Deferred should create instances
      */
     public function __construct() {}
 
     /**
-     * Attaches a listener to be called when the value is ready.
-     * Unlike Promise::then, this does not return a new Future to avoid deadlocks and chaining complexity.
+     * Attaches a listener to be called when the value is ready
+     * Unlike Promise::then, this does not return a new Future to avoid deadlocks and chaining complexity
      *
      * @param  callable|null  $onFulfilled  Success handler receiving the result
      * @param  callable|null  $onRejected   Failure handler receiving the error
@@ -52,8 +52,8 @@ class Future
     }
 
     /**
-     * Synchronously waits for the value to arrive.
-     * Uses ReactPHP async/await mechanism under the hood to drive the loop if needed.
+     * Synchronously waits for the value to arrive
+     * Uses ReactPHP async/await mechanism under the hood to drive the loop if needed
      *
      * @return mixed  The resolved value
      * @throws \Throwable If the operation failed
@@ -72,7 +72,7 @@ class Future
     }
 
     /**
-     * Sets the successful result and triggers listeners.
+     * Sets the successful result and triggers listeners
      *
      * @internal This method should only be called by the Deferred owner.
      *
@@ -88,7 +88,7 @@ class Future
     }
 
     /**
-     * Sets the failure reason and triggers listeners.
+     * Sets the failure reason and triggers listeners
      *
      * @internal This method should only be called by the Deferred owner.
      *
@@ -104,7 +104,7 @@ class Future
     }
 
     /**
-     * Triggers all attached listeners and clears the list.
+     * Triggers all attached listeners and clears the list
      *
      * @return void
      */
@@ -117,7 +117,7 @@ class Future
     }
 
     /**
-     * Checks if the future has completed (success or failure).
+     * Checks if the future has completed (success or failure)
      *
      * @return bool
      */
@@ -127,7 +127,7 @@ class Future
     }
 
     /**
-     * Returns the result if ready, or null if pending (or void/null result).
+     * Returns the result if ready, or null if pending (or void/null result)
      *
      * @return mixed
      */
@@ -137,7 +137,7 @@ class Future
     }
 
     /**
-     * Checks if the future was rejected.
+     * Checks if the future was rejected
      *
      * @return bool
      */

@@ -9,12 +9,12 @@ use React\Promise\Deferred as ReactDeferred;
 use React\Promise\PromiseInterface as ReactPromiseInterface;
 
 /**
- * Converts internal Future placeholders to industry-standard Promise objects.
+ * Converts internal Future placeholders to industry-standard Promise objects
  */
 class PromiseAdapter
 {
     /**
-     * Converts a native Future to a Guzzle Promise.
+     * Converts a native Future to a Guzzle Promise
      *
      * @param  Future  $future  The internal future to convert
      * @return \GuzzleHttp\Promise\PromiseInterface Guzzle promise resolving with the future's result
@@ -30,7 +30,7 @@ class PromiseAdapter
     }
 
     /**
-     * Converts a native Future to a ReactPHP Promise.
+     * Converts a native Future to a ReactPHP Promise
      *
      * @param  Future  $future  The internal future to convert
      * @return ReactPromiseInterface React promise resolving with the future's result
@@ -46,7 +46,7 @@ class PromiseAdapter
     }
 
     /**
-     * Converts a ReactPHP Promise to a native Future.
+     * Converts a ReactPHP Promise to a native Future
      *
      * @param  ReactPromiseInterface  $promise  The external promise to wrap
      * @return Future                           Internal future tracking the promise state
