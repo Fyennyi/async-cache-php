@@ -10,7 +10,7 @@ use Fyennyi\AsyncCache\Core\Future;
  */
 class CoalesceMiddleware implements MiddlewareInterface
 {
-    /** @var array<string, Future>  Tracks currently in-flight futures by key */
+    /** @var array<string, Future> Tracks currently in-flight futures by key */
     private static array $inFlight = [];
 
     /**
