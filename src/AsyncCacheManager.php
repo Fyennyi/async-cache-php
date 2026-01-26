@@ -76,6 +76,24 @@ class AsyncCacheManager
         return PromiseBridge::toGuzzle($reactPromise);
     }
 
+    /**
+     * Synchronous-looking version of wrap() for Fiber-enabled environments.
+     * Still non-blocking if running inside a Fiber!
+     * 
+     * @return mixed The cached or fetched data
+     */
+    public function get(string $key, callable $promise_factory, CacheOptions $options): mixed
+    {
+        $promise = $this->wrap($key, $promise_factory, $options);
+
+        // If react/async is available, use it to unwrap the promise using Fibers
+        if (function_exists('React\Async\await')) {
+            return \React\Async\await(Bridge\PromiseBridge::toReact($promise));
+        }
+
+        return $promise->wait();
+    }
+
     public function increment(string $key, int $step = 1, ?CacheOptions $options = null): \GuzzleHttp\Promise\PromiseInterface
     {
         $options = $options ?? new CacheOptions();
