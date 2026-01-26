@@ -6,14 +6,14 @@ use Fyennyi\AsyncCache\Core\CacheContext;
 use Fyennyi\AsyncCache\Enum\CacheStatus;
 use Fyennyi\AsyncCache\Event\CacheHitEvent;
 use Fyennyi\AsyncCache\Event\CacheStatusEvent;
-use Fyennyi\AsyncCache\Lock\AsyncLockWaiter;
 use Fyennyi\AsyncCache\Lock\LockInterface;
 use Fyennyi\AsyncCache\Model\CachedItem;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
-use GuzzleHttp\Promise\Create;
-use GuzzleHttp\Promise\PromiseInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
+use React\Promise\PromiseInterface;
+use function React\Promise\resolve;
+use function React\Promise\Timer\resolve as delay;
 
 /**
  * Ensures thread-safety for cache refreshing using non-blocking locks
@@ -37,30 +37,40 @@ class AsyncLockMiddleware implements MiddlewareInterface
             return $this->handleWithLock($context, $next, $lock_key);
         }
 
-        // If lock is busy, check if we can serve stale data from context (collected by previous middleware)
+        // If lock is busy, check if we can serve stale data from context
         if ($context->staleItem !== null) {
             $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, microtime(true) - $context->startTime, $context->options->tags));
             $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $context->staleItem->data));
-            return Create::promiseFor($context->staleItem->data);
+            return resolve($context->staleItem->data);
         }
 
-        // Wait asynchronously
-        return AsyncLockWaiter::waitFor($this->lock_provider, $lock_key, 30.0)
-            ->then(function (bool $acquired) use ($context, $next, $lock_key) {
-                if (!$acquired) {
-                    throw new \RuntimeException("Could not acquire lock for key: {$context->key} (Timeout)");
-                }
-
+        // WAIT ASYNCHRONOUSLY using native timers
+        $this->logger->debug('AsyncCache LOCK_BUSY: waiting for lock asynchronously', ['key' => $context->key]);
+        
+        $startTime = microtime(true);
+        $timeout = 10.0;
+        
+        $attempt = function () use (&$attempt, $context, $next, $lock_key, $startTime, $timeout) {
+            if ($this->lock_provider->acquire($lock_key, 30.0, false)) {
                 // Double-Check after lock acquisition
                 $cached_item = $this->storage->get($context->key, $context->options);
                 if ($cached_item instanceof CachedItem && $cached_item->isFresh()) {
                     $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, microtime(true) - $context->startTime, $context->options->tags));
                     $this->lock_provider->release($lock_key);
-                    return $cached_item->data;
+                    return resolve($cached_item->data);
                 }
-
                 return $this->handleWithLock($context, $next, $lock_key);
-            });
+            }
+
+            if (microtime(true) - $startTime >= $timeout) {
+                throw new \RuntimeException("Could not acquire lock for key: {$context->key} (Timeout)");
+            }
+
+            // Non-blocking delay
+            return delay(0.05)->then($attempt);
+        };
+
+        return $attempt();
     }
 
     private function handleWithLock(CacheContext $context, callable $next, string $lock_key): PromiseInterface
