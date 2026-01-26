@@ -21,6 +21,17 @@ class PromiseBridge
             return $promise;
         }
 
+        if ($promise instanceof \GuzzleHttp\Promise\PromiseInterface) {
+            $deferred = new \React\Promise\Deferred();
+            $promise->then(
+                fn($value) => $deferred->resolve($value),
+                fn($reason) => $deferred->reject($reason)
+            );
+            // Run queue to trigger the then() above if the promise is already settled
+            \GuzzleHttp\Promise\Utils::queue()->run();
+            return $deferred->promise();
+        }
+
         return resolve($promise);
     }
 
@@ -42,14 +53,11 @@ class PromiseBridge
                     break;
                 }
 
-                // If we are in a ReactPHP environment, drive the loop to process timers/events
                 if (class_exists('React\EventLoop\Loop')) {
-                    // This will run the loop until there are no more active timers or events.
-                    // Since our AsyncLockMiddleware uses delay(), the loop will run 
-                    // until that delay expires and resolves the promise.
+                    // Drive the loop once to allow progress
+                    \React\EventLoop\Loop::get()->futureTick(fn() => null);
                     \React\EventLoop\Loop::get()->run();
                 } else {
-                    // Safety break if no way to progress
                     break;
                 }
             }
@@ -60,16 +68,21 @@ class PromiseBridge
                 function($value) use ($guzzle) {
                     if ($guzzle->getState() === GuzzlePromiseInterface::PENDING) {
                         $guzzle->resolve($value);
+                        // CRITICAL: Process Guzzle's task queue immediately to trigger 'then' handlers
+                        \GuzzleHttp\Promise\Utils::queue()->run();
                     }
                 },
                 function($reason) use ($guzzle) {
                     if ($guzzle->getState() === GuzzlePromiseInterface::PENDING) {
                         $guzzle->reject($reason);
+                        // CRITICAL: Process Guzzle's task queue immediately to trigger 'then' handlers
+                        \GuzzleHttp\Promise\Utils::queue()->run();
                     }
                 }
             );
         } else {
             $guzzle->resolve($promise);
+            \GuzzleHttp\Promise\Utils::queue()->run();
         }
 
         return $guzzle;
