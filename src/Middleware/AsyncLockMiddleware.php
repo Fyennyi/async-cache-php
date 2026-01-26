@@ -8,7 +8,7 @@ use Fyennyi\AsyncCache\Event\CacheHitEvent;
 use Fyennyi\AsyncCache\Event\CacheStatusEvent;
 use Fyennyi\AsyncCache\Lock\LockInterface;
 use Fyennyi\AsyncCache\Model\CachedItem;
-use Fyennyi\AsyncCache\Runtime\RuntimeInterface;
+use Fyennyi\AsyncCache\Scheduler\SchedulerInterface;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
@@ -22,7 +22,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
     public function __construct(
         private LockInterface $lock_provider,
         private CacheStorage $storage,
-        private RuntimeInterface $runtime,
+        private SchedulerInterface $scheduler,
         private LoggerInterface $logger,
         private ?EventDispatcherInterface $dispatcher = null
     ) {
@@ -41,13 +41,13 @@ class AsyncLockMiddleware implements MiddlewareInterface
         if ($context->staleItem !== null) {
             $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, microtime(true) - $context->startTime, $context->options->tags));
             $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $context->staleItem->data));
-            return $this->runtime->resolve($context->staleItem->data);
+            return $this->scheduler->resolve($context->staleItem->data);
         }
 
-        // WAIT ASYNCHRONOUSLY using runtime abstractions
-        $this->logger->debug('AsyncCache LOCK_BUSY: waiting for lock via runtime', [
+        // WAIT ASYNCHRONOUSLY using scheduler abstractions
+        $this->logger->debug('AsyncCache LOCK_BUSY: waiting for lock via scheduler', [
             'key' => $context->key,
-            'runtime' => (new \ReflectionClass($this->runtime))->getShortName()
+            'scheduler' => (new \ReflectionClass($this->scheduler))->getShortName()
         ]);
         
         $startTime = microtime(true);
@@ -58,9 +58,9 @@ class AsyncLockMiddleware implements MiddlewareInterface
                 // Double-Check after lock acquisition
                 $cached_item = $this->storage->get($context->key, $context->options);
                 if ($cached_item instanceof CachedItem && $cached_item->isFresh()) {
-                    $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, microtime(true) - $context->startTime, $context->options->tags));
+                    $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, microtime(true) - $start_time, $context->options->tags));
                     $this->lock_provider->release($lock_key);
-                    return $this->runtime->resolve($cached_item->data);
+                    return $this->scheduler->resolve($cached_item->data);
                 }
                 return $this->handleWithLock($context, $next, $lock_key);
             }
@@ -69,8 +69,8 @@ class AsyncLockMiddleware implements MiddlewareInterface
                 throw new \RuntimeException("Could not acquire lock for key: {$context->key} (Timeout)");
             }
 
-            // Runtime-agnostic delay
-            return $this->runtime->delay(0.05)->then($attempt);
+            // Scheduler-agnostic delay
+            return $this->scheduler->delay(0.05)->then($attempt);
         };
 
         return $attempt();

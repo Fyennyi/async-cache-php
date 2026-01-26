@@ -13,8 +13,8 @@ use Fyennyi\AsyncCache\Middleware\CacheLookupMiddleware;
 use Fyennyi\AsyncCache\Middleware\SourceFetchMiddleware;
 use Fyennyi\AsyncCache\RateLimiter\RateLimiterFactory;
 use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
-use Fyennyi\AsyncCache\Runtime\RuntimeFactory;
-use Fyennyi\AsyncCache\Runtime\RuntimeInterface;
+use Fyennyi\AsyncCache\Scheduler\SchedulerFactory;
+use Fyennyi\AsyncCache\Scheduler\SchedulerInterface;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use Psr\EventDispatcher\EventDispatcherInterface;
@@ -26,7 +26,7 @@ class AsyncCacheManager
 {
     private Pipeline $pipeline;
     private CacheStorage $storage;
-    private RuntimeInterface $runtime;
+    private SchedulerInterface $scheduler;
 
     public function __construct(
         private CacheInterface $cache_adapter,
@@ -37,22 +37,21 @@ class AsyncCacheManager
         array $middlewares = [],
         private ?EventDispatcherInterface $dispatcher = null,
         ?SerializerInterface $serializer = null,
-        ?RuntimeInterface $runtime = null
+        ?SchedulerInterface $scheduler = null
     ) {
         $this->logger = $this->logger ?? new NullLogger();
         $this->storage = new CacheStorage($this->cache_adapter, $this->logger, $serializer);
         $this->lock_provider = $this->lock_provider ?? new InMemoryLockAdapter();
-        $this->runtime = $runtime ?? RuntimeFactory::create();
+        $this->scheduler = $scheduler ?? SchedulerFactory::create();
 
         if ($this->rate_limiter === null) {
             $this->rate_limiter = RateLimiterFactory::create($this->rate_limiter_type, $this->cache_adapter);
         }
 
-        // Build default pipeline if empty
         if (empty($middlewares)) {
             $middlewares = [
                 new CacheLookupMiddleware($this->storage, $this->logger, $this->dispatcher),
-                new AsyncLockMiddleware($this->lock_provider, $this->storage, $this->runtime, $this->logger, $this->dispatcher),
+                new AsyncLockMiddleware($this->lock_provider, $this->storage, $this->scheduler, $this->logger, $this->dispatcher),
                 new SourceFetchMiddleware($this->storage, $this->logger, $this->dispatcher)
             ];
         }
@@ -60,34 +59,24 @@ class AsyncCacheManager
         $this->pipeline = new Pipeline($middlewares);
     }
 
-    /**
-     * Wraps an asynchronous operation with caching, rate limiting, and stale-data fallback
-     * 
-     * @return \GuzzleHttp\Promise\PromiseInterface
-     */
     public function wrap(string $key, callable $promise_factory, CacheOptions $options) : \GuzzleHttp\Promise\PromiseInterface
     {
         $context = new CacheContext($key, $promise_factory, $options);
-        
         $reactPromise = $this->pipeline->send($context, function (CacheContext $ctx) {
             return PromiseBridge::toReact(($ctx->promiseFactory)());
         });
-
         return PromiseBridge::toGuzzle($reactPromise);
     }
 
-    /**
-     * Synchronous-looking version of wrap() for Fiber-enabled environments.
-     * Still non-blocking if running inside a Fiber!
-     * 
-     * @return mixed The cached or fetched data
-     */
     public function get(string $key, callable $promise_factory, CacheOptions $options): mixed
     {
         $promise = $this->wrap($key, $promise_factory, $options);
 
-        // If react/async is available, use it to unwrap the promise using Fibers
         if (function_exists('React\Async\await')) {
+            // Check if we are inside a Fiber
+            if (\Fiber::getCurrent() === null && class_exists('\React\EventLoop\Loop') && \React\EventLoop\Loop::get() !== null) {
+                $this->logger->warning("AsyncCache: get() called outside of a Fiber in an async environment. This will block the Event Loop!");
+            }
             return \React\Async\await(Bridge\PromiseBridge::toReact($promise));
         }
 
