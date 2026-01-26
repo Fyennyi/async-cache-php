@@ -33,12 +33,40 @@ class PromiseBridge
             return $promise;
         }
 
-        $guzzle = new GuzzlePromise();
+        /** @var GuzzlePromise $guzzle */
+        $guzzle = new GuzzlePromise(function() use (&$guzzle) {
+            while ($guzzle->getState() === GuzzlePromiseInterface::PENDING) {
+                \GuzzleHttp\Promise\Utils::queue()->run();
+                
+                if ($guzzle->getState() !== GuzzlePromiseInterface::PENDING) {
+                    break;
+                }
+
+                // If we are in a ReactPHP environment, drive the loop to process timers/events
+                if (class_exists('React\EventLoop\Loop')) {
+                    // This will run the loop until there are no more active timers or events.
+                    // Since our AsyncLockMiddleware uses delay(), the loop will run 
+                    // until that delay expires and resolves the promise.
+                    \React\EventLoop\Loop::get()->run();
+                } else {
+                    // Safety break if no way to progress
+                    break;
+                }
+            }
+        });
         
         if ($promise instanceof ReactPromiseInterface) {
             $promise->then(
-                fn($value) => $guzzle->resolve($value),
-                fn($reason) => $guzzle->reject($reason)
+                function($value) use ($guzzle) {
+                    if ($guzzle->getState() === GuzzlePromiseInterface::PENDING) {
+                        $guzzle->resolve($value);
+                    }
+                },
+                function($reason) use ($guzzle) {
+                    if ($guzzle->getState() === GuzzlePromiseInterface::PENDING) {
+                        $guzzle->reject($reason);
+                    }
+                }
             );
         } else {
             $guzzle->resolve($promise);
