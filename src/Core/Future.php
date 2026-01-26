@@ -3,8 +3,7 @@
 namespace Fyennyi\AsyncCache\Core;
 
 /**
- * The internal "currency" of the library representing a value that will eventually be available
- * Refactored to be a passive value placeholder (Container)
+ * Passive value placeholder representing a result that will eventually be available
  */
 class Future
 {

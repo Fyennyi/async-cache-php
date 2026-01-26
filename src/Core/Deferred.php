@@ -3,8 +3,7 @@
 namespace Fyennyi\AsyncCache\Core;
 
 /**
- * Manages the resolution state of a Future
- * Acts as the controller/producer side of the asynchronous operation
+ * Manages the resolution state of a Future acting as the producer controller
  */
 class Deferred
 {
