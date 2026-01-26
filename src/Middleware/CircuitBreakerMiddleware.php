@@ -2,7 +2,7 @@
 
 namespace Fyennyi\AsyncCache\Middleware;
 
-use Fyennyi\AsyncCache\CacheOptions;
+use Fyennyi\AsyncCache\Core\CacheContext;
 use GuzzleHttp\Promise\Create;
 use GuzzleHttp\Promise\PromiseInterface;
 use Psr\Log\LoggerInterface;
@@ -28,34 +28,34 @@ class CircuitBreakerMiddleware implements MiddlewareInterface
         $this->logger = $this->logger ?? new NullLogger();
     }
 
-    public function handle(string $key, callable $promise_factory, CacheOptions $options, callable $next): PromiseInterface
+    public function handle(CacheContext $context, callable $next): PromiseInterface
     {
-        $stateKey = $this->prefix . $key . ':state';
-        $failureKey = $this->prefix . $key . ':failures';
+        $stateKey = $this->prefix . $context->key . ':state';
+        $failureKey = $this->prefix . $context->key . ':failures';
 
         $state = $this->storage->get($stateKey, self::STATE_CLOSED);
 
         if ($state === self::STATE_OPEN) {
-            $lastFailureTime = (int) $this->storage->get($this->prefix . $key . ':last_failure', 0);
+            $lastFailureTime = (int) $this->storage->get($this->prefix . $context->key . ':last_failure', 0);
 
             if (time() - $lastFailureTime < $this->retryTimeout) {
-                $this->logger->error('AsyncCache CIRCUIT_BREAKER: Open state, blocking request', ['key' => $key]);
-                return Create::rejectionFor(new \RuntimeException("Circuit Breaker is OPEN for key: $key"));
+                $this->logger->error('AsyncCache CIRCUIT_BREAKER: Open state, blocking request', ['key' => $context->key]);
+                return Create::rejectionFor(new \RuntimeException("Circuit Breaker is OPEN for key: {$context->key}"));
             }
 
             // Timeout passed, move to half-open
             $state = self::STATE_HALF_OPEN;
             $this->storage->set($stateKey, self::STATE_HALF_OPEN);
-            $this->logger->warning('AsyncCache CIRCUIT_BREAKER: Half-open state, attempting probe request', ['key' => $key]);
+            $this->logger->warning('AsyncCache CIRCUIT_BREAKER: Half-open state, attempting probe request', ['key' => $context->key]);
         }
 
-        return $next($key, $promise_factory, $options)->then(
-            function ($data) use ($stateKey, $failureKey, $key) {
-                $this->onSuccess($stateKey, $failureKey, $key);
+        return $next($context)->then(
+            function ($data) use ($stateKey, $failureKey, $context) {
+                $this->onSuccess($stateKey, $failureKey, $context->key);
                 return $data;
             },
-            function ($reason) use ($stateKey, $failureKey, $key) {
-                $this->onFailure($stateKey, $failureKey, $key);
+            function ($reason) use ($stateKey, $failureKey, $context) {
+                $this->onFailure($stateKey, $failureKey, $context->key);
                 throw $reason;
             }
         );

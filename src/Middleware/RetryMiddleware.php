@@ -2,7 +2,7 @@
 
 namespace Fyennyi\AsyncCache\Middleware;
 
-use Fyennyi\AsyncCache\CacheOptions;
+use Fyennyi\AsyncCache\Core\CacheContext;
 use GuzzleHttp\Promise\PromiseInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -21,21 +21,21 @@ class RetryMiddleware implements MiddlewareInterface
         $this->logger = $this->logger ?? new NullLogger();
     }
 
-    public function handle(string $key, callable $promise_factory, CacheOptions $options, callable $next): PromiseInterface
+    public function handle(CacheContext $context, callable $next): PromiseInterface
     {
-        return $this->attempt($key, $promise_factory, $options, $next, 0);
+        return $this->attempt($context, $next, 0);
     }
 
     /**
      * Recursively attempt the request
      */
-    private function attempt(string $key, callable $promise_factory, CacheOptions $options, callable $next, int $retries): PromiseInterface
+    private function attempt(CacheContext $context, callable $next, int $retries): PromiseInterface
     {
-        return $next($key, $promise_factory, $options)->otherwise(
-            function ($reason) use ($key, $promise_factory, $options, $next, $retries) {
+        return $next($context)->otherwise(
+            function ($reason) use ($context, $next, $retries) {
                 if ($retries >= $this->maxRetries) {
                     $this->logger->error('AsyncCache RETRY: Max retries reached', [
-                        'key' => $key,
+                        'key' => $context->key,
                         'retries' => $retries,
                         'reason' => $reason
                     ]);
@@ -45,16 +45,16 @@ class RetryMiddleware implements MiddlewareInterface
                 $delay = $this->initialDelayMs * pow($this->multiplier, $retries);
 
                 $this->logger->warning('AsyncCache RETRY: Request failed, retrying...', [
-                    'key' => $key,
+                    'key' => $context->key,
                     'attempt' => $retries + 1,
                     'delay_ms' => $delay,
                     'reason' => $reason
                 ]);
 
-                // Wait for the delay
+                // Wait for the delay (still blocking, but now using Context)
                 usleep((int) ($delay * 1000));
 
-                return $this->attempt($key, $promise_factory, $options, $next, $retries + 1);
+                return $this->attempt($context, $next, $retries + 1);
             }
         );
     }
