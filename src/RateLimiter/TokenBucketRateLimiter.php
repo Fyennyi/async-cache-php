@@ -7,7 +7,7 @@ namespace Fyennyi\AsyncCache\RateLimiter;
  */
 class TokenBucketRateLimiter implements RateLimiterInterface
 {
-    /** @var array  State of all buckets (tokens and last refill time) */
+    /** @var array State of all buckets (tokens and last refill time) */
     private array $tokens = [];
 
     /**
