@@ -22,6 +22,7 @@ class RateLimiterFactory
         return match ($type) {
             RateLimiterType::Symfony => new SymfonyRateLimiter(),
             RateLimiterType::InMemory => new InMemoryRateLimiter(),
+            RateLimiterType::TokenBucket => new TokenBucketRateLimiter(),
             RateLimiterType::Auto => self::createBest($cache),
         };
     }
