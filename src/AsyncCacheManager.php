@@ -7,7 +7,6 @@ use Fyennyi\AsyncCache\Core\Deferred;
 use Fyennyi\AsyncCache\Core\Future;
 use Fyennyi\AsyncCache\Core\Pipeline;
 use Fyennyi\AsyncCache\Core\Timer;
-use Fyennyi\AsyncCache\Enum\RateLimiterType;
 use Fyennyi\AsyncCache\Lock\InMemoryLockAdapter;
 use Fyennyi\AsyncCache\Lock\LockInterface;
 use Fyennyi\AsyncCache\Middleware\AsyncLockMiddleware;
@@ -15,8 +14,6 @@ use Fyennyi\AsyncCache\Middleware\CacheLookupMiddleware;
 use Fyennyi\AsyncCache\Middleware\CoalesceMiddleware;
 use Fyennyi\AsyncCache\Middleware\SourceFetchMiddleware;
 use Fyennyi\AsyncCache\Middleware\StaleOnErrorMiddleware;
-use Fyennyi\AsyncCache\RateLimiter\RateLimiterFactory;
-use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use GuzzleHttp\Promise\PromiseInterface as GuzzlePromiseInterface;
@@ -24,9 +21,10 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
-use function React\Async\await;
 use function React\Async\async;
+use function React\Async\await;
 use React\Promise\PromiseInterface as ReactPromiseInterface;
+use Symfony\Component\RateLimiter\LimiterInterface;
 
 /**
  * Universal Asynchronous Cache Manager powered by native Futures
@@ -37,19 +35,17 @@ class AsyncCacheManager
     private CacheStorage $storage;
 
     /**
-     * @param  CacheInterface                 $cache_adapter      The PSR-16 cache implementation
-     * @param  RateLimiterInterface|null      $rate_limiter       The rate limiter implementation
-     * @param  RateLimiterType                $rate_limiter_type  Type of rate limiter to use
-     * @param  LoggerInterface|null           $logger             The PSR-3 logger implementation
-     * @param  LockInterface|null             $lock_provider      The distributed lock provider
-     * @param  array                          $middlewares        Optional custom middleware stack
-     * @param  EventDispatcherInterface|null  $dispatcher         The PSR-14 event dispatcher
-     * @param  SerializerInterface|null       $serializer         The custom serializer
+     * @param  CacheInterface                 $cache_adapter  The PSR-16 cache implementation
+     * @param  LimiterInterface|null          $rate_limiter   The Symfony Rate Limiter implementation
+     * @param  LoggerInterface|null           $logger         The PSR-3 logger implementation
+     * @param  LockInterface|null             $lock_provider  The distributed lock provider
+     * @param  array                          $middlewares    Optional custom middleware stack
+     * @param  EventDispatcherInterface|null  $dispatcher     The PSR-14 event dispatcher
+     * @param  SerializerInterface|null       $serializer     The custom serializer
      */
     public function __construct(
         private CacheInterface $cache_adapter,
-        private ?RateLimiterInterface $rate_limiter = null,
-        private RateLimiterType $rate_limiter_type = RateLimiterType::Auto,
+        private ?LimiterInterface $rate_limiter = null,
         private ?LoggerInterface $logger = null,
         private ?LockInterface $lock_provider = null,
         array $middlewares = [],
@@ -59,10 +55,6 @@ class AsyncCacheManager
         $this->logger = $this->logger ?? new NullLogger();
         $this->storage = new CacheStorage($this->cache_adapter, $this->logger, $serializer);
         $this->lock_provider = $this->lock_provider ?? new InMemoryLockAdapter();
-
-        if ($this->rate_limiter === null) {
-            $this->rate_limiter = RateLimiterFactory::create($this->rate_limiter_type, $this->cache_adapter);
-        }
 
         if (empty($middlewares)) {
             $middlewares = [
@@ -265,21 +257,20 @@ class AsyncCacheManager
     /**
      * Returns the rate limiter instance
      *
-     * @return RateLimiterInterface
+     * @return LimiterInterface|null
      */
-    public function getRateLimiter() : RateLimiterInterface
+    public function getRateLimiter() : ?LimiterInterface
     {
         return $this->rate_limiter;
     }
 
     /**
-     * Clears rate limits for a specific key or entirely
+     * Resets the rate limiter state
      *
-     * @param  string|null  $key  Optional key to clear
      * @return void
      */
-    public function clearRateLimiter(?string $key = null) : void
+    public function clearRateLimiter() : void
     {
-        $this->rate_limiter->clear($key);
+        $this->rate_limiter?->reset();
     }
 }
