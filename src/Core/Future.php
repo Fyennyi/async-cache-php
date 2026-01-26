@@ -2,29 +2,26 @@
 
 namespace Fyennyi\AsyncCache\Core;
 
+use GuzzleHttp\Promise\Promise as GuzzlePromise;
+use GuzzleHttp\Promise\PromiseInterface as GuzzlePromiseInterface;
+use React\Promise\PromiseInterface as ReactPromiseInterface;
+use React\Promise\Deferred as ReactDeferred;
+
 /**
- * The internal "currency" of the library representing a future value.
- * Standard-agnostic and focused on core caching logic.
+ * The core Future object of AsyncCache.
  */
 class Future
 {
-    /** @var array<callable> */
     private array $handlers = [];
     private mixed $result = null;
     private bool $resolved = false;
     private bool $rejected = false;
 
-    /**
-     * @param callable|null $waitFn Optional function to drive resolution when wait() is called
-     */
-    public function __construct(private $waitFn = null)
-    {
-    }
+    public function __construct(private $waitFn = null) {}
 
     public function then(callable $onFulfilled = null, callable $onRejected = null): self
     {
         $next = new self($this->waitFn);
-        
         $handler = function () use ($next, $onFulfilled, $onRejected) {
             try {
                 if ($this->rejected) {
@@ -77,19 +74,38 @@ class Future
         if (!$this->resolved && !$this->rejected && $this->waitFn) {
             ($this->waitFn)();
         }
-        if ($this->rejected && $this->result instanceof \Throwable) {
-            throw $this->result;
-        }
         return $this->result;
     }
 
-    public function isSettled(): bool { return $this->resolved || $this->rejected; }
+    /**
+     * Converts to Guzzle Promise
+     */
+    public function toGuzzle(): GuzzlePromiseInterface
+    {
+        $guzzle = new GuzzlePromise(fn() => $this->wait());
+        $this->then(
+            fn($v) => $guzzle->resolve($v),
+            fn($r) => $guzzle->reject($r)
+        );
+        return $guzzle;
+    }
+
+    /**
+     * Converts to ReactPHP Promise
+     */
+    public function toReact(): ReactPromiseInterface
+    {
+        $deferred = new ReactDeferred();
+        $this->then(
+            fn($v) => $deferred->resolve($v),
+            fn($r) => $deferred->reject($r)
+        );
+        return $deferred->promise();
+    }
 
     private function fire(): void
     {
-        foreach ($this->handlers as $handler) {
-            $handler();
-        }
+        foreach ($this->handlers as $handler) { $handler(); }
         $this->handlers = [];
     }
 }

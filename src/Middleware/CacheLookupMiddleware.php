@@ -3,25 +3,24 @@
 namespace Fyennyi\AsyncCache\Middleware;
 
 use Fyennyi\AsyncCache\Core\CacheContext;
+use Fyennyi\AsyncCache\Core\Deferred;
 use Fyennyi\AsyncCache\Core\Future;
 use Fyennyi\AsyncCache\Enum\CacheStatus;
 use Fyennyi\AsyncCache\Enum\CacheStrategy;
 use Fyennyi\AsyncCache\Event\CacheHitEvent;
 use Fyennyi\AsyncCache\Event\CacheStatusEvent;
 use Fyennyi\AsyncCache\Model\CachedItem;
-use Fyennyi\AsyncCache\Scheduler\SchedulerInterface;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Handles initial cache lookup and freshness check using native Futures
+ * Handles initial cache lookup and freshness check
  */
 class CacheLookupMiddleware implements MiddlewareInterface
 {
     public function __construct(
         private CacheStorage $storage,
-        private SchedulerInterface $scheduler,
         private LoggerInterface $logger,
         private ?EventDispatcherInterface $dispatcher = null
     ) {
@@ -53,14 +52,18 @@ class CacheLookupMiddleware implements MiddlewareInterface
             if ($is_fresh) {
                 $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, microtime(true) - $context->startTime, $context->options->tags));
                 $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $cached_item->data));
-                return $this->scheduler->resolve($cached_item->data);
+                $deferred = new Deferred();
+                $deferred->resolve($cached_item->data);
+                return $deferred->future();
             }
 
             if ($context->options->strategy === CacheStrategy::Background) {
                 $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, microtime(true) - $context->startTime, $context->options->tags));
                 $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $cached_item->data));
                 $next($context);
-                return $this->scheduler->resolve($cached_item->data);
+                $deferred = new Deferred();
+                $deferred->resolve($cached_item->data);
+                return $deferred->future();
             }
         }
 
