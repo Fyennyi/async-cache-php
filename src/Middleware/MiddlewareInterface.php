@@ -2,22 +2,20 @@
 
 namespace Fyennyi\AsyncCache\Middleware;
 
-use Fyennyi\AsyncCache\CacheOptions;
+use Fyennyi\AsyncCache\Core\CacheContext;
 use GuzzleHttp\Promise\PromiseInterface;
 
 /**
- * Interface for AsyncCache middleware
+ * Interface for all AsyncCache middlewares
  */
 interface MiddlewareInterface
 {
     /**
-     * Handles the cache wrapping process
+     * Handle the cache request
      * 
-     * @param string $key Cache key
-     * @param callable $promise_factory Original data factory
-     * @param CacheOptions $options Request options
-     * @param callable $next The next middleware or the core logic
+     * @param CacheContext $context The current resolution state
+     * @param callable $next The next middleware in the pipeline
      * @return PromiseInterface
      */
-    public function handle(string $key, callable $promise_factory, CacheOptions $options, callable $next): PromiseInterface;
+    public function handle(CacheContext $context, callable $next): PromiseInterface;
 }
