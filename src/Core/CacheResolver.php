@@ -2,6 +2,7 @@
 
 namespace Fyennyi\AsyncCache\Core;
 
+use Fyennyi\AsyncCache\Bridge\GuzzlePromiseAdapter;
 use Fyennyi\AsyncCache\CacheOptions;
 use Fyennyi\AsyncCache\Enum\CacheStatus;
 use Fyennyi\AsyncCache\Enum\CacheStrategy;
@@ -10,6 +11,7 @@ use Fyennyi\AsyncCache\Event\CacheMissEvent;
 use Fyennyi\AsyncCache\Event\CacheStatusEvent;
 use Fyennyi\AsyncCache\Event\RateLimitExceededEvent;
 use Fyennyi\AsyncCache\Exception\RateLimitException;
+use Fyennyi\AsyncCache\Lock\AsyncLockWaiter;
 use Fyennyi\AsyncCache\Lock\LockInterface;
 use Fyennyi\AsyncCache\Model\CachedItem;
 use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
@@ -101,26 +103,55 @@ class CacheResolver
         }
 
         $lock_key = 'lock:' . $key;
+        
+        // Try to acquire lock immediately (non-blocking)
         if (!$this->lock_provider->acquire($lock_key, 30.0, false)) {
+            // If lock is busy, check if we can serve stale data
             if ($stale_item !== null) {
                 $this->logger->info('AsyncCache LOCK_BUSY: serving stale data', ['key' => $key, 'status' => CacheStatus::Stale->value]);
+                $this->dispatcher?->dispatch(new CacheStatusEvent($key, CacheStatus::Stale, microtime(true) - $start_time_total, $options->tags));
                 $this->dispatcher?->dispatch(new CacheHitEvent($key, $stale_item->data));
                 return Create::promiseFor($stale_item->data);
             }
-            if (!$this->lock_provider->acquire($lock_key, 30.0, true)) {
-                return Create::rejectionFor(new \RuntimeException("Could not acquire lock for key: $key"));
-            }
+
+            // If no stale data, we wait ASYNCHRONOUSLY
+            $this->logger->debug('AsyncCache LOCK_BUSY: waiting for lock asynchronously', ['key' => $key]);
+            
+            return $this->pending_promises[$key] = AsyncLockWaiter::waitFor($this->lock_provider, $lock_key, 30.0)
+                ->then(function (bool $acquired) use ($key, $promise_factory, $options, $start_time_total) {
+                    if (!$acquired) {
+                        $this->logger->error('AsyncCache LOCK_TIMEOUT: could not acquire lock asynchronously', ['key' => $key]);
+                        throw new \RuntimeException("Could not acquire lock for key: $key (Timeout)");
+                    }
+
+                    // DOUBLE-CHECK: Now that we have the lock, maybe Request 1 already filled the cache?
+                    $cached_item = $this->storage->get($key, $options);
+                    if ($cached_item instanceof CachedItem && $cached_item->isFresh()) {
+                        $this->logger->info('AsyncCache HIT_AFTER_LOCK: fresh data found after waiting for lock', ['key' => $key]);
+                        $this->dispatcher?->dispatch(new CacheStatusEvent($key, CacheStatus::Hit, microtime(true) - $start_time_total, $options->tags));
+                        $this->dispatcher?->dispatch(new CacheHitEvent($key, $cached_item->data));
+                        $this->lock_provider->release('lock:' . $key); // Important to release since we won't call executeFetch
+                        return $cached_item->data;
+                    }
+
+                    return $this->executeFetch($key, $promise_factory, $options, $start_time_total);
+                });
         }
 
+        return $this->pending_promises[$key] = $this->executeFetch($key, $promise_factory, $options, $start_time_total);
+    }
+
+    /**
+     * Core execution logic separated for reuse in async/sync flows
+     */
+    private function executeFetch(string $key, callable $promise_factory, CacheOptions $options, float $start_time_total): PromiseInterface
+    {
+        $lock_key = 'lock:' . $key;
+        
         if ($options->rate_limit_key && $this->rate_limiter->isLimited($options->rate_limit_key)) {
             $this->lock_provider->release($lock_key);
             $this->dispatcher?->dispatch(new CacheStatusEvent($key, CacheStatus::RateLimited, microtime(true) - $start_time_total, $options->tags));
             $this->dispatcher?->dispatch(new RateLimitExceededEvent($key, $options->rate_limit_key));
-
-            if ($options->serve_stale_if_limited && $stale_item !== null) {
-                $this->logger->warning('AsyncCache RATE_LIMIT: serving stale data', ['key' => $key, 'status' => CacheStatus::RateLimited->value]);
-                return Create::promiseFor($stale_item->data);
-            }
             return Create::rejectionFor(new RateLimitException($options->rate_limit_key));
         }
 
@@ -131,7 +162,7 @@ class CacheResolver
         }
 
         $start_time = microtime(true);
-        $promise = $promise_factory()->then(
+        return GuzzlePromiseAdapter::wrap($promise_factory())->then(
             function ($data) use ($key, $options, $lock_key, $start_time, $start_time_total) {
                 $generation_time = microtime(true) - $start_time;
                 unset($this->pending_promises[$key]);
@@ -147,10 +178,8 @@ class CacheResolver
                     'key' => $key,
                     'reason' => $reason
                 ]);
-                throw $reason;
+                throw $reason instanceof \Throwable ? $reason : new \RuntimeException((string)$reason);
             }
         );
-
-        return $this->pending_promises[$key] = $promise;
     }
 }
