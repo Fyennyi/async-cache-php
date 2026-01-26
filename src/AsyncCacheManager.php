@@ -103,23 +103,6 @@ class AsyncCacheManager
     }
 
     /**
-     * Returns the result directly using synchronous wait (via Loop if needed)
-     *
-     * @template T
-     *
-     * @param  string        $key              Cache key identifier
-     * @param  callable      $promise_factory  Function that returns a value or promise
-     * @param  CacheOptions  $options          Caching configuration
-     * @return mixed                           The final processed result
-     *
-     * @throws \Throwable If the operation fails and no stale data is available
-     */
-    public function get(string $key, callable $promise_factory, CacheOptions $options) : mixed
-    {
-        return $this->wrap($key, $promise_factory, $options)->wait();
-    }
-
-    /**
      * Atomically increments a cached integer value
      *
      * @param  string             $key      The key to increment
