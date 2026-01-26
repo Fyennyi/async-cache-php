@@ -13,6 +13,8 @@ use Fyennyi\AsyncCache\Middleware\CacheLookupMiddleware;
 use Fyennyi\AsyncCache\Middleware\SourceFetchMiddleware;
 use Fyennyi\AsyncCache\RateLimiter\RateLimiterFactory;
 use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
+use Fyennyi\AsyncCache\Runtime\RuntimeFactory;
+use Fyennyi\AsyncCache\Runtime\RuntimeInterface;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use Psr\EventDispatcher\EventDispatcherInterface;
@@ -24,6 +26,7 @@ class AsyncCacheManager
 {
     private Pipeline $pipeline;
     private CacheStorage $storage;
+    private RuntimeInterface $runtime;
 
     public function __construct(
         private CacheInterface $cache_adapter,
@@ -33,11 +36,13 @@ class AsyncCacheManager
         private ?LockInterface $lock_provider = null,
         array $middlewares = [],
         private ?EventDispatcherInterface $dispatcher = null,
-        ?SerializerInterface $serializer = null
+        ?SerializerInterface $serializer = null,
+        ?RuntimeInterface $runtime = null
     ) {
         $this->logger = $this->logger ?? new NullLogger();
         $this->storage = new CacheStorage($this->cache_adapter, $this->logger, $serializer);
         $this->lock_provider = $this->lock_provider ?? new InMemoryLockAdapter();
+        $this->runtime = $runtime ?? RuntimeFactory::create();
 
         if ($this->rate_limiter === null) {
             $this->rate_limiter = RateLimiterFactory::create($this->rate_limiter_type, $this->cache_adapter);
@@ -47,7 +52,7 @@ class AsyncCacheManager
         if (empty($middlewares)) {
             $middlewares = [
                 new CacheLookupMiddleware($this->storage, $this->logger, $this->dispatcher),
-                new AsyncLockMiddleware($this->lock_provider, $this->storage, $this->logger, $this->dispatcher),
+                new AsyncLockMiddleware($this->lock_provider, $this->storage, $this->runtime, $this->logger, $this->dispatcher),
                 new SourceFetchMiddleware($this->storage, $this->logger, $this->dispatcher)
             ];
         }
@@ -71,33 +76,21 @@ class AsyncCacheManager
         return PromiseBridge::toGuzzle($reactPromise);
     }
 
-    /**
-     * Atomically increments a cached integer value
-     */
     public function increment(string $key, int $step = 1, ?CacheOptions $options = null): \GuzzleHttp\Promise\PromiseInterface
     {
         $options = $options ?? new CacheOptions();
         $lockKey = 'lock:counter:' . $key;
-
-        // Note: For simplicity, keeping this blocking or using same logic
-        // In a true async library, this should also be a middleware or async-lock based
         if ($this->lock_provider->acquire($lockKey, 10.0, true)) {
             $item = $this->storage->get($key, $options);
             $currentValue = $item ? (int) $item->data : 0;
             $newValue = $currentValue + $step;
-
             $this->storage->set($key, $newValue, $options);
             $this->lock_provider->release($lockKey);
-
             return \GuzzleHttp\Promise\Create::promiseFor($newValue);
         }
-
         return \GuzzleHttp\Promise\Create::rejectionFor(new \RuntimeException("Could not acquire lock for incrementing key: $key"));
     }
 
-    /**
-     * Atomically decrements a cached integer value
-     */
     public function decrement(string $key, int $step = 1, ?CacheOptions $options = null): \GuzzleHttp\Promise\PromiseInterface
     {
         return $this->increment($key, -$step, $options);
