@@ -10,7 +10,7 @@ use Symfony\Component\Lock\SharedLockInterface;
  */
 class SymfonyLockAdapter implements LockInterface
 {
-    /** @var array<string, SharedLockInterface>  Map of active lock objects */
+    /** @var array<string, SharedLockInterface> Map of active lock objects */
     private array $locks = [];
 
     /**
