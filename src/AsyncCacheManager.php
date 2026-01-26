@@ -13,7 +13,7 @@ use Fyennyi\AsyncCache\Middleware\CacheLookupMiddleware;
 use Fyennyi\AsyncCache\Middleware\SourceFetchMiddleware;
 use Fyennyi\AsyncCache\RateLimiter\RateLimiterFactory;
 use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
-use Fyennyi\AsyncCache\Scheduler\SchedulerFactory;
+use Fyennyi\AsyncCache\Scheduler\ReactScheduler;
 use Fyennyi\AsyncCache\Scheduler\SchedulerInterface;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
@@ -21,7 +21,12 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
+use React\Promise\PromiseInterface;
+use function React\Async\await;
 
+/**
+ * High-performance Asynchronous Cache Manager powered by ReactPHP and Fibers
+ */
 class AsyncCacheManager
 {
     private Pipeline $pipeline;
@@ -42,7 +47,9 @@ class AsyncCacheManager
         $this->logger = $this->logger ?? new NullLogger();
         $this->storage = new CacheStorage($this->cache_adapter, $this->logger, $serializer);
         $this->lock_provider = $this->lock_provider ?? new InMemoryLockAdapter();
-        $this->scheduler = $scheduler ?? SchedulerFactory::create();
+        
+        // Pure ReactPHP by default
+        $this->scheduler = $scheduler ?? new ReactScheduler();
 
         if ($this->rate_limiter === null) {
             $this->rate_limiter = RateLimiterFactory::create($this->rate_limiter_type, $this->cache_adapter);
@@ -59,46 +66,59 @@ class AsyncCacheManager
         $this->pipeline = new Pipeline($middlewares);
     }
 
-    public function wrap(string $key, callable $promise_factory, CacheOptions $options) : \GuzzleHttp\Promise\PromiseInterface
+    /**
+     * Internal async wrapping. Returns ReactPHP Promise.
+     */
+    public function wrap(string $key, callable $promise_factory, CacheOptions $options): PromiseInterface
     {
         $context = new CacheContext($key, $promise_factory, $options);
-        $reactPromise = $this->pipeline->send($context, function (CacheContext $ctx) {
+        
+        return $this->pipeline->send($context, function (CacheContext $ctx) {
             return PromiseBridge::toReact(($ctx->promiseFactory)());
         });
-        return PromiseBridge::toGuzzle($reactPromise);
     }
 
+    /**
+     * Pure Fiber-based access. Looks synchronous, works asynchronously.
+     * 
+     * @return mixed The cached or fetched data
+     */
     public function get(string $key, callable $promise_factory, CacheOptions $options): mixed
     {
-        $promise = $this->wrap($key, $promise_factory, $options);
-
-        if (function_exists('React\Async\await')) {
-            // Check if we are inside a Fiber
-            if (\Fiber::getCurrent() === null && class_exists('\React\EventLoop\Loop') && \React\EventLoop\Loop::get() !== null) {
-                $this->logger->warning("AsyncCache: get() called outside of a Fiber in an async environment. This will block the Event Loop!");
-            }
-            return \React\Async\await(Bridge\PromiseBridge::toReact($promise));
-        }
-
-        return $promise->wait();
+        return await($this->wrap($key, $promise_factory, $options));
     }
 
-    public function increment(string $key, int $step = 1, ?CacheOptions $options = null): \GuzzleHttp\Promise\PromiseInterface
+    /**
+     * Guzzle-compatible wrapper for legacy applications
+     */
+    public function wrapGuzzle(string $key, callable $promise_factory, CacheOptions $options): \GuzzleHttp\Promise\PromiseInterface
+    {
+        return PromiseBridge::toGuzzle($this->wrap($key, $promise_factory, $options));
+    }
+
+    public function increment(string $key, int $step = 1, ?CacheOptions $options = null): PromiseInterface
     {
         $options = $options ?? new CacheOptions();
         $lockKey = 'lock:counter:' . $key;
+        
+        // Logic remains internal to ReactPHP promises
+        $deferred = new \React\Promise\Deferred();
+        
         if ($this->lock_provider->acquire($lockKey, 10.0, true)) {
             $item = $this->storage->get($key, $options);
             $currentValue = $item ? (int) $item->data : 0;
             $newValue = $currentValue + $step;
             $this->storage->set($key, $newValue, $options);
             $this->lock_provider->release($lockKey);
-            return \GuzzleHttp\Promise\Create::promiseFor($newValue);
+            $deferred->resolve($newValue);
+        } else {
+            $deferred->reject(new \RuntimeException("Could not acquire lock for incrementing key: $key"));
         }
-        return \GuzzleHttp\Promise\Create::rejectionFor(new \RuntimeException("Could not acquire lock for incrementing key: $key"));
+
+        return $deferred->promise();
     }
 
-    public function decrement(string $key, int $step = 1, ?CacheOptions $options = null): \GuzzleHttp\Promise\PromiseInterface
+    public function decrement(string $key, int $step = 1, ?CacheOptions $options = null): PromiseInterface
     {
         return $this->increment($key, -$step, $options);
     }

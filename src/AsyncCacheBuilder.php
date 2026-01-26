@@ -13,7 +13,7 @@ use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
 
 /**
- * Fluent builder for AsyncCacheManager to improve Developer Experience
+ * Fluent builder for AsyncCacheManager focused on ReactPHP and Fibers
  */
 class AsyncCacheBuilder
 {
