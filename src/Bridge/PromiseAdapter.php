@@ -99,12 +99,7 @@ class PromiseAdapter
             );
 
             // Ensure Guzzle's task queue is flushed
-        if (class_exists(Utils::class)) {
             Utils::queue()->run();
-        } else {
-            // @phpstan-ignore-next-line
-            \GuzzleHttp\Promise\queue()->run();
-        }
 
             return $deferred->future();
         }
