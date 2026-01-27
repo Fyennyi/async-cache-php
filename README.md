@@ -11,42 +11,39 @@ An asynchronous caching abstraction layer for PHP with built-in rate limiting an
 
 ## Features
 
-- **Asynchronous Caching**: Wraps `PromiseInterface` to handle caching transparently without blocking execution.
-- **Stale-While-Limited Strategy**: If the rate limit is hit, the library can return stale data (if available) instead of failing, improving resilience.
+- **Asynchronous Caching**: Wraps `PromiseInterface` or any callable returning a value/promise to handle caching transparently without blocking execution.
+- **Stale-While-Revalidate**: Supports background revalidation and stale-on-error patterns.
+- **X-Fetch (Probabilistic Early Recomputation)**: Implements the X-Fetch algorithm to prevent cache stampedes (dog-pile effect).
+- **Atomic Operations**: Support for atomic `increment` and `decrement` operations using Symfony Lock.
 - **Logical vs. Physical TTL**: Separates the "freshness" of data from its "existence" in the cache, enabling soft expiration patterns.
-- **Rate Limiting Interface**: Includes support for multiple rate limiter implementations (InMemory, Symfony Rate Limiter) with automatic detection and factory pattern.
-- **PSR-16 Compliant**: Works with any PSR-16 Simple Cache adapter.
+- **Rate Limiting Integration**: Supports Symfony Rate Limiter for request throttling.
+- **PSR-16 & ReactPHP Compatible**: Works with any PSR-16 Simple Cache adapter or ReactPHP Cache implementation.
 
 ## Installation
 
 To install the Async Cache PHP library, run the following command in your terminal:
 
 ```bash
- composer require fyennyi/async-cache-php
+composer require fyennyi/async-cache-php
 ```
 
 ## Usage
 
 ### Basic Setup
 
-You need a PSR-16 cache implementation and a rate limiter.
+The easiest way to create a manager is using the `AsyncCacheBuilder`.
 
 ```php
-use Fyennyi\AsyncCache\AsyncCacheManager;
-use Fyennyi\AsyncCache\RateLimiter\InMemoryRateLimiter;
-use Symfony\Component\Cache\Adapter\FilesystemAdapter;
-use Symfony\Component\Cache\Psr16Cache;
+use Fyennyi\AsyncCache\AsyncCacheBuilder;
+use Fyennyi\AsyncCache\Storage\ReactCacheAdapter;
+use React\Cache\ArrayCache;
 
-// 1. Setup Cache (using Symfony Cache as an example)
-$psr16Cache = new Psr16Cache(new FilesystemAdapter());
+// 1. Setup Cache (using ReactPHP ArrayCache as an example)
+$cacheAdapter = new ReactCacheAdapter(new ArrayCache());
 
-// 2. Setup Rate Limiter
-$rateLimiter = new InMemoryRateLimiter();
-// Allow 1 request every 5 seconds for the 'my_api' key
-$rateLimiter->configure('my_api', 5);
-
-// 3. Create the Manager
-$manager = new AsyncCacheManager($psr16Cache, $rateLimiter);
+// 2. Create the Manager using the Builder
+$manager = AsyncCacheBuilder::create($cacheAdapter)
+    ->build();
 ```
 
 ### Wrapping an Async Operation
@@ -55,14 +52,14 @@ Use the `wrap` method to cache a promise-based operation.
 
 ```php
 use Fyennyi\AsyncCache\CacheOptions;
+use Fyennyi\AsyncCache\Enum\CacheStrategy;
 use GuzzleHttp\Client;
 
 $client = new Client();
 
 $options = new CacheOptions(
     ttl: 60,                        // Data is fresh for 60 seconds
-    rate_limit_key: 'my_api',       // Use the 'my_api' rate limit bucket
-    serve_stale_if_limited: true    // If rate limited, return old data instead of failing
+    strategy: CacheStrategy::Strict // Default strategy
 );
 
 $promise = $manager->wrap(
@@ -71,32 +68,44 @@ $promise = $manager->wrap(
     $options
 );
 
+// Wait for the result (non-blocking if used within ReactPHP event loop)
 $response = $promise->wait();
 ```
 
-### How It Works
-
-1. **Cache Hit**: If data is found in the cache and is fresh (within `ttl`), the promise resolves immediately with the cached value. The factory function is not called.
-2. **Cache Miss**: If data is not found, the factory function is executed, and the result is stored in the cache.
-3. **Stale Data & Rate Limits**:
-   - If data is in the cache but expired (older than `ttl`), the manager checks the Rate Limiter.
-   - If the request is **Rate Limited** (too frequent) AND `serve_stale_if_limited` is `true`, the manager returns the **stale data** immediately. This prevents API errors and keeps your application responsive.
-   - If the request is allowed by the Rate Limiter, the factory function is executed to fetch fresh data.
-
-## Configuration Options
+### Advanced Configuration Options
 
 The `CacheOptions` DTO allows you to configure behavior per request:
 
 ```php
+use Fyennyi\AsyncCache\Enum\CacheStrategy;
+
 new CacheOptions(
-    ttl: 300,                     // Time in seconds data is considered fresh
-    rate_limit_key: 'nominatim',  // Key for rate limiting (null to disable)
-    serve_stale_if_limited: true, // Return stale data if rate limited
-    stale_grace_period: 86400,    // Keep stale data physically in cache for 24h
-    force_refresh: false,         // Ignore cache and force new request
-    tags: ['geo', 'kyiv']         // Cache tags (if adapter supports them)
+    ttl: 300,                        // Time in seconds data is considered fresh
+    stale_grace_period: 86400,       // Keep stale data physically in cache for 24h
+    strategy: CacheStrategy::Strict, // Strict, Background, or ForceRefresh
+    rate_limit_key: 'nominatim',     // Key for rate limiting (if limiter is configured)
+    serve_stale_if_limited: true,    // Return stale data if rate limited
+    tags: ['geo', 'kyiv'],           // Cache tags (if adapter supports them)
+    compression: false,              // Enable data compression
+    x_fetch_beta: 1.0                // Beta coefficient for X-Fetch (0 to disable)
 );
 ```
+
+### Atomic Increments
+
+```php
+$newValue = $manager->increment('page_views', 1)->wait();
+```
+
+## How It Works
+
+1. **Cache Hit**: If data is found in the cache and is fresh (within `ttl`), the promise resolves immediately with the cached value. The factory function is not called.
+2. **Cache Miss**: If data is not found, the factory function is executed, and the result is stored in the cache.
+3. **Stale Data**:
+   - If data is in the cache but expired (older than `ttl`), the manager behavior depends on the chosen `strategy`.
+   - **Strict**: Fetches fresh data while the request waits.
+   - **Background**: Returns stale data immediately and triggers an asynchronous refresh in the background.
+4. **X-Fetch**: Helps avoid simultaneous cache misses for the same key by probabilistic early recomputation.
 
 ## Contributing
 
