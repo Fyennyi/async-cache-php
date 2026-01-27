@@ -7,8 +7,6 @@ use Fyennyi\AsyncCache\Core\Deferred;
 use Fyennyi\AsyncCache\Core\Future;
 use Fyennyi\AsyncCache\Core\Pipeline;
 use Fyennyi\AsyncCache\Core\Timer;
-use Fyennyi\AsyncCache\Lock\InMemoryLockAdapter;
-use Fyennyi\AsyncCache\Lock\LockInterface;
 use Fyennyi\AsyncCache\Middleware\AsyncLockMiddleware;
 use Fyennyi\AsyncCache\Middleware\CacheLookupMiddleware;
 use Fyennyi\AsyncCache\Middleware\CoalesceMiddleware;
@@ -20,6 +18,8 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\SemaphoreStore;
 use Symfony\Component\RateLimiter\LimiterInterface;
 
 /**
@@ -34,7 +34,7 @@ class AsyncCacheManager
      * @param  CacheInterface                 $cache_adapter  The PSR-16 cache implementation
      * @param  LimiterInterface|null          $rate_limiter   The Symfony Rate Limiter implementation
      * @param  LoggerInterface|null           $logger         The PSR-3 logger implementation
-     * @param  LockInterface|null             $lock_provider  The distributed lock provider
+     * @param  LockFactory|null               $lock_factory   The Symfony Lock Factory
      * @param  array                          $middlewares    Optional custom middleware stack
      * @param  EventDispatcherInterface|null  $dispatcher     The PSR-14 event dispatcher
      * @param  SerializerInterface|null       $serializer     The custom serializer
@@ -43,21 +43,21 @@ class AsyncCacheManager
         private CacheInterface $cache_adapter,
         private ?LimiterInterface $rate_limiter = null,
         private ?LoggerInterface $logger = null,
-        private ?LockInterface $lock_provider = null,
+        private ?LockFactory $lock_factory = null,
         array $middlewares = [],
         private ?EventDispatcherInterface $dispatcher = null,
         ?SerializerInterface $serializer = null
     ) {
         $this->logger = $this->logger ?? new NullLogger();
         $this->storage = new CacheStorage($this->cache_adapter, $this->logger, $serializer);
-        $this->lock_provider = $this->lock_provider ?? new InMemoryLockAdapter();
+        $this->lock_factory = $this->lock_factory ?? new LockFactory(new SemaphoreStore());
 
         if (empty($middlewares)) {
             $middlewares = [
                 new CoalesceMiddleware(),
                 new StaleOnErrorMiddleware($this->logger, $this->dispatcher),
                 new CacheLookupMiddleware($this->storage, $this->logger, $this->dispatcher),
-                new AsyncLockMiddleware($this->lock_provider, $this->storage, $this->logger, $this->dispatcher),
+                new AsyncLockMiddleware($this->lock_factory, $this->storage, $this->logger, $this->dispatcher),
                 new SourceFetchMiddleware($this->storage, $this->logger, $this->dispatcher)
             ];
         }
@@ -126,16 +126,18 @@ class AsyncCacheManager
         $timeout = 10.0;
 
         $attempt = function () use (&$attempt, $key, $step, $options, $lockKey, $deferred, $startTime, $timeout) {
-            if ($this->lock_provider->acquire($lockKey, 10.0, false)) {
+            $lock = $this->lock_factory->createLock($lockKey, 10.0);
+            
+            if ($lock->acquire(false)) {
                 try {
                     $item = $this->storage->get($key, $options);
                     $currentValue = $item ? (int) $item->data : 0;
                     $newValue = $currentValue + $step;
                     $this->storage->set($key, $newValue, $options);
-                    $this->lock_provider->release($lockKey);
+                    $lock->release();
                     $deferred->resolve($newValue);
                 } catch (\Throwable $e) {
-                    $this->lock_provider->release($lockKey);
+                    $lock->release();
                     $deferred->reject($e);
                 }
                 return;
