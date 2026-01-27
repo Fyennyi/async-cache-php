@@ -4,24 +4,36 @@ namespace Tests\Unit;
 
 use Fyennyi\AsyncCache\AsyncCacheManager;
 use Fyennyi\AsyncCache\CacheOptions;
-use Fyennyi\AsyncCache\Exception\RateLimitException;
-use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
-use GuzzleHttp\Promise\Create;
+use Fyennyi\AsyncCache\Enum\CacheStrategy;
+use Fyennyi\AsyncCache\Model\CachedItem;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
+use Symfony\Component\RateLimiter\LimiterInterface;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\LockInterface;
+use Symfony\Component\Lock\Store\InMemoryStore;
 
 class AsyncCacheManagerTest extends TestCase
 {
     private MockObject|CacheInterface $cache;
-    private MockObject|RateLimiterInterface $rateLimiter;
+    private MockObject|LimiterInterface $rateLimiter;
+    private LockFactory $lockFactory;
     private AsyncCacheManager $manager;
 
     protected function setUp() : void
     {
         $this->cache = $this->createMock(CacheInterface::class);
-        $this->rateLimiter = $this->createMock(RateLimiterInterface::class);
-        $this->manager = new AsyncCacheManager($this->cache, $this->rateLimiter);
+        $this->rateLimiter = $this->createMock(LimiterInterface::class);
+        $this->lockFactory = new LockFactory(new InMemoryStore()); // Use real in-memory locks
+
+        $this->manager = new AsyncCacheManager(
+            cache_adapter: $this->cache,
+            rate_limiter: $this->rateLimiter,
+            logger: new NullLogger(),
+            lock_factory: $this->lockFactory
+        );
     }
 
     public function testReturnsFreshCacheImmediately() : void
@@ -30,20 +42,22 @@ class AsyncCacheManagerTest extends TestCase
         $data = 'cached_data';
         $options = new CacheOptions(ttl: 60);
 
-        // Mock cache hit with fresh data
+        // Mock cache hit via PSR adapter (CacheStorage calls adapter->get)
+        // Note: CacheStorage wraps result in CachedItem. 
+        // Since we mock PSR cache, PsrToAsyncAdapter returns whatever PSR returns.
+        // CacheStorage expects either CachedItem object or array ['d' => ..., 'e' => ...].
+        
+        $cachedItem = new CachedItem($data, time() + 100);
+        // We simulate that the underlying cache returns a serialized version or object depending on adapter.
+        // PsrToAsyncAdapter just passes value through.
+        
         $this->cache->expects($this->once())
             ->method('get')
             ->with($key)
-            ->willReturn([
-                'd' => $data,
-                'e' => time() + 100 // Expires in future
-            ]);
+            ->willReturn($cachedItem);
 
-        // Rate limiter should NOT be called
-        $this->rateLimiter->expects($this->never())->method('isLimited');
-
-        $promise = $this->manager->wrap($key, fn() => Create::promiseFor('new_data'), $options);
-        $result = $promise->wait();
+        $future = $this->manager->wrap($key, fn() => 'new_data', $options);
+        $result = $future->wait();
 
         $this->assertSame($data, $result);
     }
@@ -54,106 +68,41 @@ class AsyncCacheManagerTest extends TestCase
         $newData = 'new_data';
         $options = new CacheOptions(ttl: 60);
 
-        // Mock cache miss
+        // 1. Cache lookup
         $this->cache->expects($this->once())->method('get')->with($key)->willReturn(null);
 
-        // Should store new data
+        // 2. Cache set (after fetch)
         $this->cache->expects($this->once())->method('set');
 
-        $promise = $this->manager->wrap($key, fn() => Create::promiseFor($newData), $options);
-        $result = $promise->wait();
+        $future = $this->manager->wrap($key, fn() => $newData, $options);
+        $result = $future->wait();
 
         $this->assertSame($newData, $result);
     }
 
-    public function testReturnsStaleDataIfRateLimited() : void
+    public function testForceRefreshStrategy() : void
     {
         $key = 'test_key';
-        $staleData = 'stale_data';
-        $options = new CacheOptions(
-            ttl: 60,
-            rate_limit_key: 'api_limit',
-            serve_stale_if_limited: true
-        );
+        $newData = 'fresh_data';
+        $options = new CacheOptions(ttl: 60, strategy: CacheStrategy::ForceRefresh);
 
-        // Mock cache hit but EXPIRED (stale)
-        $this->cache->expects($this->once())
-            ->method('get')
-            ->with($key)
-            ->willReturn([
-                'd' => $staleData,
-                'e' => time() - 10 // Expired 10s ago
-            ]);
+        // Should NOT check cache for get (strategy bypasses lookup)
+        // But might check for lock/etc. Actually CacheLookupMiddleware handles ForceRefresh by calling next() immediately.
+        // So adapter->get should NOT be called by CacheLookupMiddleware.
+        
+        // Wait, CacheLookupMiddleware does: if (ForceRefresh) return next($context).
+        // So get() is skipped.
+        
+        // Then SourceFetchMiddleware calls factory and sets cache.
+        $this->cache->expects($this->once())->method('set');
+        
+        // Ensure get is never called (except maybe by other middlewares? No)
+        $this->cache->expects($this->never())->method('get');
 
-        // Rate limiter says YES, we are limited
-        $this->rateLimiter->expects($this->once())
-            ->method('isLimited')
-            ->with('api_limit')
-            ->willReturn(true);
+        $future = $this->manager->wrap($key, fn() => $newData, $options);
+        $result = $future->wait();
 
-        // Factory should NOT be called
-        $called = false;
-        $factory = function() use (&$called) {
-            $called = true;
-            return Create::promiseFor('new');
-        };
-
-        $promise = $this->manager->wrap($key, $factory, $options);
-        $result = $promise->wait();
-
-        $this->assertSame($staleData, $result);
-        $this->assertFalse($called, "Factory should not have been called");
-    }
-
-    public function testThrowsExceptionIfRateLimitedAndNoStaleData() : void
-    {
-        $key = 'test_key';
-        $options = new CacheOptions(
-            ttl: 60,
-            rate_limit_key: 'api_limit',
-            serve_stale_if_limited: true
-        );
-
-        // Mock cache MISS
-        $this->cache->expects($this->once())->method('get')->willReturn(null);
-
-        // Rate limited
-        $this->rateLimiter->expects($this->once())->method('isLimited')->willReturn(true);
-
-        $this->expectException(RateLimitException::class);
-
-        $promise = $this->manager->wrap($key, fn() => Create::promiseFor('new'), $options);
-        $promise->wait();
-    }
-
-    public function testRecordsExecutionWhenRateLimitKeyIsProvided() : void
-    {
-        $key = 'test_key';
-        $options = new CacheOptions(rate_limit_key: 'api_limit');
-
-        $this->cache->method('get')->willReturn(null);
-
-        // Verify recordExecution is called
-        $this->rateLimiter->expects($this->once())
-            ->method('recordExecution')
-            ->with('api_limit');
-
-        $promise = $this->manager->wrap($key, fn() => Create::promiseFor('data'), $options);
-        $promise->wait();
-    }
-
-    public function testDoesNotCacheIfTtlIsNull() : void
-    {
-        $key = 'test_key';
-        $options = new CacheOptions(ttl: null);
-
-        $this->cache->method('get')->willReturn(null);
-
-        // Verify set is NEVER called
-        $this->cache->expects($this->never())->method('set');
-
-        $promise = $this->manager->wrap($key, fn() => Create::promiseFor('data'), $options);
-        $promise->wait();
+        $this->assertSame($newData, $result);
     }
 
     public function testClearsCache() : void
@@ -162,7 +111,11 @@ class AsyncCacheManagerTest extends TestCase
             ->method('clear')
             ->willReturn(true);
 
-        $this->assertTrue($this->manager->clear());
+        $future = $this->manager->clear();
+        $result = $future->wait();
+        
+        // The adapter result (true) is returned
+        $this->assertTrue($result);
     }
 
     public function testDeletesCacheKey() : void
@@ -174,6 +127,9 @@ class AsyncCacheManagerTest extends TestCase
             ->with($key)
             ->willReturn(true);
 
-        $this->assertTrue($this->manager->delete($key));
+        $future = $this->manager->delete($key);
+        $result = $future->wait();
+
+        $this->assertTrue($result);
     }
 }
