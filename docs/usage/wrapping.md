@@ -1,6 +1,6 @@
 # Wrapping Operations
 
-The core of the library is the `wrap` method. It allows you to wrap any asynchronous operation (a factory that returns a `PromiseInterface`) with caching logic.
+The core of the library is the `wrap` method. It allows you to wrap any asynchronous operation (a factory that returns a value or a `PromiseInterface`) with caching logic.
 
 ## The `wrap` Method
 
@@ -9,7 +9,7 @@ public function wrap(
     string $key, 
     callable $factory, 
     CacheOptions $options
-): PromiseInterface
+): Future
 ```
 
 ### Example: Wrapping a Guzzle Request
@@ -18,6 +18,7 @@ public function wrap(
 <?php
 
 use Fyennyi\AsyncCache\CacheOptions;
+use Fyennyi\AsyncCache\Enum\CacheStrategy;
 use GuzzleHttp\Client;
 
 $client = new Client();
@@ -25,20 +26,17 @@ $client = new Client();
 // Configure how this specific request should be cached
 $options = new CacheOptions(
     ttl: 60,                        // Data is fresh for 60 seconds
-    rate_limit_key: 'my_api',       // Match the limiter config
-    serve_stale_if_limited: true    // Use stale data on rate limit
+    strategy: CacheStrategy::Strict // Default strategy
 );
 
-$promise = $manager->wrap(
+$future = $manager->wrap(
     'user_profile_1',
     fn() => $client->getAsync('https://api.example.com/users/1'),
     $options
 );
 
-// The factory is only called if:
-// 1. Data is not in cache
-// 2. Data is stale AND the rate limiter allows a new request
-$response = $promise->wait();
+// wait() will resolve the promise (non-blocking if in event loop)
+$response = $future->wait();
 ```
 
 ## Cache Options
@@ -46,8 +44,12 @@ $response = $promise->wait();
 The `CacheOptions` DTO provides granular control over the caching behavior:
 
 - **`ttl`**: Time in seconds the data is considered fresh.
-- **`rate_limit_key`**: Identifier for rate limiting.
-- **`serve_stale_if_limited`**: Whether to return expired data when rate limited.
+- **`strategy`**: The caching strategy to use (from `CacheStrategy` enum).
+    - `Strict`: Fetches fresh data if stale.
+    - `Background`: Returns stale data immediately and refreshes in background.
+    - `ForceRefresh`: Bypasses cache lookup.
 - **`stale_grace_period`**: How long to keep expired data in the cache (physical TTL).
-- **`force_refresh`**: Bypass cache and always call the factory.
+- **`rate_limit_key`**: Identifier for rate limiting logic.
+- **`serve_stale_if_limited`**: Whether to return expired data when rate limited.
 - **`tags`**: Tags for cache invalidation.
+- **`x_fetch_beta`**: Beta coefficient for X-Fetch algorithm.

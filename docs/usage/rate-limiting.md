@@ -1,41 +1,41 @@
 # Rate Limiting
 
-The library uses rate limiting to manage how often the data source is contacted when cache entries expire.
+The library integrates with **Symfony Rate Limiter** to manage how often the data source is contacted when cache entries expire.
 
-## The `RateLimiterInterface`
+## Integration
 
-All rate limiters must implement the `RateLimiterInterface`.
+Instead of implementing a custom interface, you can use any implementation of `Symfony\Component\RateLimiter\LimiterInterface`.
 
-### `InMemoryRateLimiter`
-
-The library provides a simple in-memory implementation suitable for CLI scripts or single-process applications.
+### Example with Symfony Rate Limiter
 
 ```php
-<?php
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
-use Fyennyi\AsyncCache\RateLimiter\InMemoryRateLimiter;
+$factory = new RateLimiterFactory([
+    'id' => 'my_api',
+    'policy' => 'token_bucket',
+    'limit' => 5,
+    'rate' => ['interval' => '10 seconds'],
+], new InMemoryStorage());
 
-$limiter = new InMemoryRateLimiter();
-$limiter->configure('api_endpoint', 10); // 1 request per 10 seconds
+$limiter = $factory->create();
+
+$manager = AsyncCacheBuilder::create($cache)
+    ->withRateLimiter($limiter)
+    ->build();
 ```
 
 ## How It Interacts with Cache
 
-When a cache item is requested:
-1. If **Fresh**: Data is returned immediately.
-2. If **Stale**:
-    - The manager calls `$limiter->isLimited($key)`.
-    - If **Limited**: Returns stale data (if `serve_stale_if_limited` is true).
-    - If **Not Limited**: Calls the factory to get fresh data and resets the limiter.
+When a cache item is stale and a refresh is needed:
+1. The manager checks if a `rate_limit_key` is provided in `CacheOptions`.
+2. It calls `$limiter->consume(1)`.
+3. If **Accepted**: The factory function is called to fetch fresh data.
+4. If **Rejected**: 
+    - If `serve_stale_if_limited` is **true** and stale data exists, the stale data is returned.
+    - Otherwise, a `RateLimitException` is thrown.
 
-## Custom Implementations
+## Benefit of Symfony Integration
 
-For distributed systems (like web servers behind a load balancer), you should implement a persistent rate limiter using Redis or a database.
-
-```php
-use Fyennyi\AsyncCache\RateLimiter\RateLimiterInterface;
-
-class RedisRateLimiter implements RateLimiterInterface {
-    // Implement your logic here
-}
-```
+By using Symfony Rate Limiter, you gain access to various storage backends (Redis, Database, PHP-APC) and sophisticated policies (Token Bucket, Fixed Window, Sliding Window) without additional configuration in this library.

@@ -39,29 +39,35 @@ The library works with any PSR-16 compliant cache. Here are examples using popul
     $psr16Cache = new Psr16Cache(new MemcachedAdapter($memcached));
     ```
 
-## Setup the Rate Limiter
+## Setup the Rate Limiter (Optional)
 
-The Rate Limiter prevents the library from making too many requests to your data source when the cache expires.
+The library integrates with **Symfony Rate Limiter**. You can pass any `LimiterInterface` to the manager.
 
 ```php
-<?php
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
-use Fyennyi\AsyncCache\RateLimiter\InMemoryRateLimiter;
+$factory = new RateLimiterFactory([
+    'id' => 'my_api',
+    'policy' => 'fixed_window',
+    'limit' => 10,
+    'interval' => '1 minute',
+], new InMemoryStorage());
 
-$rateLimiter = new InMemoryRateLimiter();
-
-// Allow 1 request every 5 seconds for the 'my_api' identifier
-$rateLimiter->configure('my_api', 5);
+$limiter = $factory->create();
 ```
 
 ## Create the Manager
 
-Finally, instantiate the `AsyncCacheManager`:
+The recommended way to instantiate the `AsyncCacheManager` is using the `AsyncCacheBuilder`:
 
 ```php
 <?php
 
-use Fyennyi\AsyncCache\AsyncCacheManager;
+use Fyennyi\AsyncCache\AsyncCacheBuilder;
 
-$manager = new AsyncCacheManager($psr16Cache, $rateLimiter);
+$manager = AsyncCacheBuilder::create($psr16Cache)
+    ->withRateLimiter($limiter) // Optional
+    ->withLogger($logger)       // Optional (PSR-3)
+    ->build();
 ```

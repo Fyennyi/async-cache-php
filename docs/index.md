@@ -13,8 +13,10 @@ It solves the common problem of handling expired cache items when the underlying
 
 ## Key Features
 
-- **Asynchronous Caching**: Wraps `PromiseInterface` to handle caching transparently without blocking execution.
-- **Stale-While-Limited Strategy**: If the rate limit is hit, the library can return stale data (if available) instead of failing.
+- **Asynchronous Caching**: Wraps `PromiseInterface` or any callable to handle caching transparently without blocking execution.
+- **Stale-While-Revalidate**: Supports background revalidation and stale-on-error patterns.
+- **X-Fetch Algorithm**: Prevents cache stampedes (dog-pile effect) via probabilistic early recomputation.
+- **Atomic Operations**: Support for atomic `increment` and `decrement` operations using Symfony Lock.
+- **Rate Limiting Integration**: Built-in support for Symfony Rate Limiter for request throttling.
 - **Logical vs. Physical TTL**: Separates the "freshness" of data from its "existence" in the cache.
-- **Rate Limiting Interface**: Includes a simple in-memory rate limiter and an interface for persistent implementations.
-- **PSR-16 Compliant**: Works with any PSR-16 Simple Cache adapter.
+- **Universal Adapters**: Works with PSR-16, ReactPHP Cache, or native Async adapters.
