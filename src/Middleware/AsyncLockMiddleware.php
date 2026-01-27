@@ -9,25 +9,29 @@ use Fyennyi\AsyncCache\Core\Timer;
 use Fyennyi\AsyncCache\Enum\CacheStatus;
 use Fyennyi\AsyncCache\Event\CacheHitEvent;
 use Fyennyi\AsyncCache\Event\CacheStatusEvent;
-use Fyennyi\AsyncCache\Lock\LockInterface;
 use Fyennyi\AsyncCache\Model\CachedItem;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\LockInterface;
 
 /**
- * Synchronization middleware that prevents race conditions during cache population
+ * Synchronization middleware that prevents race conditions using Symfony Lock
  */
 class AsyncLockMiddleware implements MiddlewareInterface
 {
+    /** @var array<string, LockInterface> Active locks storage */
+    private array $activeLocks = [];
+
     /**
-     * @param  LockInterface                  $lock_provider  The lock management implementation
-     * @param  CacheStorage                   $storage        The cache interaction layer
-     * @param  LoggerInterface                $logger         Logging implementation
-     * @param  EventDispatcherInterface|null  $dispatcher     Event dispatcher for telemetry
+     * @param  LockFactory                    $lock_factory  Symfony Lock Factory
+     * @param  CacheStorage                   $storage       The cache interaction layer
+     * @param  LoggerInterface                $logger        Logging implementation
+     * @param  EventDispatcherInterface|null  $dispatcher    Event dispatcher for telemetry
      */
     public function __construct(
-        private LockInterface $lock_provider,
+        private LockFactory $lock_factory,
         private CacheStorage $storage,
         private LoggerInterface $logger,
         private ?EventDispatcherInterface $dispatcher = null
@@ -44,8 +48,10 @@ class AsyncLockMiddleware implements MiddlewareInterface
     public function handle(CacheContext $context, callable $next) : Future
     {
         $lock_key = 'lock:' . $context->key;
+        $lock = $this->lock_factory->createLock($lock_key, 30.0);
 
-        if ($this->lock_provider->acquire($lock_key, 30.0, false)) {
+        if ($lock->acquire(false)) {
+            $this->activeLocks[$lock_key] = $lock;
             return $this->handleWithLock($context, $next, $lock_key);
         }
 
@@ -66,11 +72,14 @@ class AsyncLockMiddleware implements MiddlewareInterface
         $masterDeferred = new Deferred();
 
         $attempt = function () use (&$attempt, $context, $next, $lock_key, $startTime, $timeout, $masterDeferred) {
-            if ($this->lock_provider->acquire($lock_key, 30.0, false)) {
+            $lock = $this->lock_factory->createLock($lock_key, 30.0);
+            
+            if ($lock->acquire(false)) {
+                $this->activeLocks[$lock_key] = $lock;
                 $cached_item = $this->storage->get($context->key, $context->options);
                 if ($cached_item instanceof CachedItem && $cached_item->isFresh()) {
                     $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, microtime(true) - $startTime, $context->options->tags));
-                    $this->lock_provider->release($lock_key);
+                    $this->releaseLock($lock_key);
                     $masterDeferred->resolve($cached_item->data);
                     return;
                 }
@@ -113,15 +122,26 @@ class AsyncLockMiddleware implements MiddlewareInterface
 
         $next($context)->onResolve(
             function ($data) use ($lock_key, $deferred) {
-                $this->lock_provider->release($lock_key);
+                $this->releaseLock($lock_key);
                 $deferred->resolve($data);
             },
             function ($reason) use ($lock_key, $deferred) {
-                $this->lock_provider->release($lock_key);
+                $this->releaseLock($lock_key);
                 $deferred->reject($reason);
             }
         );
 
         return $deferred->future();
+    }
+
+    /**
+     * Safely releases and removes the lock from tracking
+     */
+    private function releaseLock(string $lock_key): void
+    {
+        if (isset($this->activeLocks[$lock_key])) {
+            $this->activeLocks[$lock_key]->release();
+            unset($this->activeLocks[$lock_key]);
+        }
     }
 }
