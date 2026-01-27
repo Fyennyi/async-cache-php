@@ -58,6 +58,14 @@ class Future
      */
     public function wait() : mixed
     {
+        if ($this->isResolved) {
+            return $this->result;
+        }
+
+        if ($this->isRejected) {
+            throw $this->result instanceof \Throwable ? $this->result : new \RuntimeException((string)$this->result);
+        }
+
         // Bridge to ReactPHP's await mechanism without full Adapter dependency
         $deferred = new \React\Promise\Deferred();
 
@@ -72,7 +80,7 @@ class Future
     /**
      * Sets the successful result and triggers listeners
      *
-     * @internal This method should only be called by the Deferred owner.
+     * @internal This method should only be called by the Deferred owner
      *
      * @param  mixed  $value  The value to complete the future with
      * @return void
