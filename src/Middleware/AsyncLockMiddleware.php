@@ -73,7 +73,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
 
         $attempt = function () use (&$attempt, $context, $next, $lock_key, $startTime, $timeout, $masterDeferred) {
             $lock = $this->lock_factory->createLock($lock_key, 30.0);
-            
+
             if ($lock->acquire(false)) {
                 $this->activeLocks[$lock_key] = $lock;
                 $cached_item = $this->storage->get($context->key, $context->options);

@@ -3,7 +3,6 @@
 namespace Fyennyi\AsyncCache\Bridge\Symfony\DependencyInjection;
 
 use Fyennyi\AsyncCache\AsyncCacheManager;
-use Fyennyi\AsyncCache\Lock\LockInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;

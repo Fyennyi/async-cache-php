@@ -127,7 +127,7 @@ class AsyncCacheManager
 
         $attempt = function () use (&$attempt, $key, $step, $options, $lockKey, $deferred, $startTime, $timeout) {
             $lock = $this->lock_factory->createLock($lockKey, 10.0);
-            
+
             if ($lock->acquire(false)) {
                 try {
                     $item = $this->storage->get($key, $options);
