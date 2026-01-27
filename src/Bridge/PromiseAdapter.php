@@ -40,6 +40,9 @@ class PromiseAdapter
 {
     /**
      * Converts a native Future to a Guzzle Promise
+     *
+     * @param  Future  $future  The library-native Future instance to be adapted
+     * @return GuzzlePromiseInterface A Guzzle Promise that completes when the Future is resolved or rejected
      */
     public static function toGuzzle(Future $future) : GuzzlePromiseInterface
     {
@@ -53,6 +56,9 @@ class PromiseAdapter
 
     /**
      * Converts a native Future to a ReactPHP Promise
+     *
+     * @param  Future  $future  The library-native Future instance to be adapted
+     * @return ReactPromiseInterface A ReactPHP Promise that completes when the Future is resolved or rejected
      */
     public static function toReact(Future $future) : ReactPromiseInterface
     {
