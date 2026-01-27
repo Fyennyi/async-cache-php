@@ -56,6 +56,7 @@ class SlowAdapter implements \Psr\SimpleCache\CacheInterface {
 class StatsTracker {
     public int $hits = 0;
     public int $misses = 0;
+    public ?string $lastStatus = null;
 }
 $tracker = new StatsTracker();
 
@@ -63,6 +64,7 @@ class TelemetryDispatcher implements \Psr\EventDispatcher\EventDispatcherInterfa
     public function __construct(private StatsTracker $tracker) {}
     public function dispatch(object $event): object {
         if ($event instanceof \Fyennyi\AsyncCache\Event\CacheStatusEvent) {
+            $this->tracker->lastStatus = $event->status->value;
             if ($event->status === \Fyennyi\AsyncCache\Enum\CacheStatus::Hit) $this->tracker->hits++;
             if ($event->status === \Fyennyi\AsyncCache\Enum\CacheStatus::Miss) $this->tracker->misses++;
         }
@@ -110,6 +112,7 @@ $http = new HttpServer(async(function (ServerRequestInterface $request) use ($me
     // 1. Slow API Demo (Coalescing Showcase)
     if ($path === '/api/slow') {
         $start = microtime(true);
+        $tracker->lastStatus = null;
         try {
             $res = $memoryManager->wrap('georgia_flag', function() use ($browser) {
                 return $browser->get('https://restcountries.com/v3.1/name/georgia')
@@ -119,10 +122,14 @@ $http = new HttpServer(async(function (ServerRequestInterface $request) use ($me
                     });
             }, new CacheOptions(ttl: 15))->wait();
 
+            $source = 'fresh';
+            if ($tracker->lastStatus === 'hit') $source = 'cache';
+            if ($tracker->lastStatus === 'stale') $source = 'stale_fallback';
+
             return Response::json([
                 'latency' => round(microtime(true) - $start, 4),
                 'data' => $res,
-                'source' => 'AsyncCache'
+                'source' => $source
             ]);
         } catch (\Throwable $e) {
             return Response::json(['status' => 'error', 'message' => $e->getMessage()]);
