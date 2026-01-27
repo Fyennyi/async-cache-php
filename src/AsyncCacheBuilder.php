@@ -2,12 +2,12 @@
 
 namespace Fyennyi\AsyncCache;
 
-use Fyennyi\AsyncCache\Lock\LockInterface;
 use Fyennyi\AsyncCache\Middleware\MiddlewareInterface;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
+use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\RateLimiter\LimiterInterface;
 
 /**
@@ -17,7 +17,7 @@ class AsyncCacheBuilder
 {
     private ?LimiterInterface $rateLimiter = null;
     private ?LoggerInterface $logger = null;
-    private ?LockInterface $lockProvider = null;
+    private ?LockFactory $lockFactory = null;
     /** @var MiddlewareInterface[] */
     private array $middlewares = [];
     private ?EventDispatcherInterface $dispatcher = null;
@@ -66,14 +66,14 @@ class AsyncCacheBuilder
     }
 
     /**
-     * Configures the distributed lock provider
+     * Configures the Symfony Lock Factory
      *
-     * @param  LockInterface  $lockProvider  Lock implementation
-     * @return self                          Current builder instance
+     * @param  LockFactory  $lockFactory  Lock factory instance
+     * @return self                       Current builder instance
      */
-    public function withLockProvider(LockInterface $lockProvider) : self
+    public function withLockFactory(LockFactory $lockFactory) : self
     {
-        $this->lockProvider = $lockProvider;
+        $this->lockFactory = $lockFactory;
         return $this;
     }
 
@@ -124,7 +124,7 @@ class AsyncCacheBuilder
             $this->cacheAdapter,
             $this->rateLimiter,
             $this->logger,
-            $this->lockProvider,
+            $this->lockFactory,
             $this->middlewares,
             $this->dispatcher,
             $this->serializer
