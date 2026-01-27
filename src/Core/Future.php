@@ -37,10 +37,10 @@ class Future
     private mixed $result = null;
 
     /** @var bool Whether the future has been successfully resolved */
-    private bool $isResolved = false;
+    private bool $is_resolved = false;
 
     /** @var bool Whether the future has been rejected */
-    private bool $isRejected = false;
+    private bool $is_rejected = false;
 
     /**
      * Internal constructor. Only Deferred should create instances
@@ -50,22 +50,22 @@ class Future
     /**
      * Attaches a listener to be called when the value is ready without returning a new Future
      *
-     * @param  callable|null  $onFulfilled  Success handler receiving the result
-     * @param  callable|null  $onRejected   Failure handler receiving the error
-     * @return self                         Returns itself for fluent interface (but not chaining new futures)
+     * @param  callable|null  $on_fulfilled  Success handler receiving the result
+     * @param  callable|null  $on_rejected   Failure handler receiving the error
+     * @return self                          Returns itself for fluent interface (but not chaining new futures)
      */
-    public function onResolve(?callable $onFulfilled = null, ?callable $onRejected = null) : self
+    public function onResolve(?callable $on_fulfilled = null, ?callable $on_rejected = null) : self
     {
-        if ($this->isResolved) {
-            if ($onFulfilled) $onFulfilled($this->result);
-        } elseif ($this->isRejected) {
-            if ($onRejected) $onRejected($this->result);
+        if ($this->is_resolved) {
+            if ($on_fulfilled) $on_fulfilled($this->result);
+        } elseif ($this->is_rejected) {
+            if ($on_rejected) $on_rejected($this->result);
         } else {
-            $this->listeners[] = function() use ($onFulfilled, $onRejected) {
-                if ($this->isRejected) {
-                    if ($onRejected) $onRejected($this->result);
+            $this->listeners[] = function() use ($on_fulfilled, $on_rejected) {
+                if ($this->is_rejected) {
+                    if ($on_rejected) $on_rejected($this->result);
                 } else {
-                    if ($onFulfilled) $onFulfilled($this->result);
+                    if ($on_fulfilled) $on_fulfilled($this->result);
                 }
             };
         }
@@ -81,11 +81,11 @@ class Future
      */
     public function wait() : mixed
     {
-        if ($this->isResolved) {
+        if ($this->is_resolved) {
             return $this->result;
         }
 
-        if ($this->isRejected) {
+        if ($this->is_rejected) {
             throw $this->result instanceof \Throwable ? $this->result : new \RuntimeException((string)$this->result);
         }
 
@@ -110,9 +110,9 @@ class Future
      */
     public function fulfill(mixed $value) : void
     {
-        if ($this->isResolved || $this->isRejected) return;
+        if ($this->is_resolved || $this->is_rejected) return;
         $this->result = $value;
-        $this->isResolved = true;
+        $this->is_resolved = true;
         $this->fire();
     }
 
@@ -126,9 +126,9 @@ class Future
      */
     public function notifyFailure(mixed $reason) : void
     {
-        if ($this->isResolved || $this->isRejected) return;
+        if ($this->is_resolved || $this->is_rejected) return;
         $this->result = $reason;
-        $this->isRejected = true;
+        $this->is_rejected = true;
         $this->fire();
     }
 
@@ -152,7 +152,7 @@ class Future
      */
     public function isReady() : bool
     {
-        return $this->isResolved || $this->isRejected;
+        return $this->is_resolved || $this->is_rejected;
     }
 
     /**
@@ -172,6 +172,6 @@ class Future
      */
     public function isFailed() : bool
     {
-        return $this->isRejected;
+        return $this->is_rejected;
     }
 }

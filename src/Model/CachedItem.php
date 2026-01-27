@@ -33,20 +33,20 @@ class CachedItem
     public const CURRENT_VERSION = 1;
 
     /**
-     * @param  mixed   $data               The actual cached value
-     * @param  int     $logicalExpireTime  Unix timestamp when the data becomes stale
-     * @param  int     $version            Metadata schema version
-     * @param  bool    $isCompressed       Whether the data is currently gzipped
-     * @param  float   $generationTime     Duration in seconds taken to fetch this data
-     * @param  array   $tagVersions        Map of tag names to their versions at caching time
+     * @param  mixed   $data                 The actual cached value
+     * @param  int     $logical_expire_time  Unix timestamp when the data becomes stale
+     * @param  int     $version              Metadata schema version
+     * @param  bool    $is_compressed        Whether the data is currently gzipped
+     * @param  float   $generation_time      Duration in seconds taken to fetch this data
+     * @param  array   $tag_versions         Map of tag names to their versions at caching time
      */
     public function __construct(
         public readonly mixed $data,
-        public readonly int $logicalExpireTime,
+        public readonly int $logical_expire_time,
         public readonly int $version = self::CURRENT_VERSION,
-        public readonly bool $isCompressed = false,
-        public readonly float $generationTime = 0.0,
-        public readonly array $tagVersions = []
+        public readonly bool $is_compressed = false,
+        public readonly float $generation_time = 0.0,
+        public readonly array $tag_versions = []
     ) {
     }
 
@@ -57,6 +57,6 @@ class CachedItem
      */
     public function isFresh() : bool
     {
-        return time() < $this->logicalExpireTime;
+        return time() < $this->logical_expire_time;
     }
 }

@@ -66,7 +66,7 @@ class StaleOnErrorMiddleware implements MiddlewareInterface
                 $deferred->resolve($data);
             },
             function ($reason) use ($context, $deferred) {
-                if ($context->staleItem !== null) {
+                if ($context->stale_item !== null) {
                     $this->logger->warning('AsyncCache STALE_ON_ERROR: fetch failed, serving stale data', [
                         'key' => $context->key,
                         'reason' => $reason instanceof \Throwable ? $reason->getMessage() : (string)$reason
@@ -75,11 +75,11 @@ class StaleOnErrorMiddleware implements MiddlewareInterface
                     $this->dispatcher?->dispatch(new CacheStatusEvent(
                         $context->key,
                         CacheStatus::Stale,
-                        microtime(true) - $context->startTime,
+                        microtime(true) - $context->start_time,
                         $context->options->tags
                     ));
 
-                    $deferred->resolve($context->staleItem->data);
+                    $deferred->resolve($context->stale_item->data);
                     return;
                 }
 

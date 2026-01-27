@@ -73,21 +73,21 @@ class CacheLookupMiddleware implements MiddlewareInterface
         $this->storage->get($context->key, $context->options)->onResolve(
             function ($cached_item) use ($context, $next, $deferred) {
                 if ($cached_item instanceof CachedItem) {
-                    $context->staleItem = $cached_item;
+                    $context->stale_item = $cached_item;
                     $is_fresh = $cached_item->isFresh();
 
-                    if ($is_fresh && $context->options->x_fetch_beta > 0 && $cached_item->generationTime > 0) {
+                    if ($is_fresh && $context->options->x_fetch_beta > 0 && $cached_item->generation_time > 0) {
                         $rand = mt_rand(1, mt_getrandmax()) / mt_getrandmax();
-                        $check = time() - ($cached_item->generationTime * $context->options->x_fetch_beta * log($rand));
+                        $check = time() - ($cached_item->generation_time * $context->options->x_fetch_beta * log($rand));
 
-                        if ($check > $cached_item->logicalExpireTime) {
-                            $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::XFetch, microtime(true) - $context->startTime, $context->options->tags));
+                        if ($check > $cached_item->logical_expire_time) {
+                            $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::XFetch, microtime(true) - $context->start_time, $context->options->tags));
                             $is_fresh = false;
                         }
                     }
 
                     if ($is_fresh) {
-                        $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, microtime(true) - $context->startTime, $context->options->tags));
+                        $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, microtime(true) - $context->start_time, $context->options->tags));
                         $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $cached_item->data));
 
                         $deferred->resolve($cached_item->data);
@@ -95,7 +95,7 @@ class CacheLookupMiddleware implements MiddlewareInterface
                     }
 
                     if ($context->options->strategy === CacheStrategy::Background) {
-                        $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, microtime(true) - $context->startTime, $context->options->tags));
+                        $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, microtime(true) - $context->start_time, $context->options->tags));
                         $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $cached_item->data));
                         $next($context);
 

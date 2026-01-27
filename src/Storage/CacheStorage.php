@@ -84,10 +84,10 @@ class CacheStorage
                 }
 
                 // Tag Validation
-                if (! empty($cached_item->tagVersions)) {
-                    $this->getTagVersions(array_keys($cached_item->tagVersions))->onResolve(
+                if (! empty($cached_item->tag_versions)) {
+                    $this->getTagVersions(array_keys($cached_item->tag_versions))->onResolve(
                         function ($current_versions) use ($key, $cached_item, $deferred) {
-                            foreach ($cached_item->tagVersions as $tag => $saved_version) {
+                            foreach ($cached_item->tag_versions as $tag => $saved_version) {
                                 if (($current_versions[$tag] ?? null) !== $saved_version) {
                                     $this->logger->debug('AsyncCache TAG_INVALID', ['key' => $key, 'tag' => $tag]);
                                     $deferred->resolve(null);
@@ -147,10 +147,10 @@ class CacheStorage
 
                 $item = new CachedItem(
                     data: $data,
-                    logicalExpireTime: time() + $options->ttl,
-                    isCompressed: $is_compressed,
-                    generationTime: $generation_time,
-                    tagVersions: $tag_versions
+                    logical_expire_time: time() + $options->ttl,
+                    is_compressed: $is_compressed,
+                    generation_time: $generation_time,
+                    tag_versions: $tag_versions
                 );
 
                 $this->adapter->set($key, $item, $physical_ttl)->onResolve(
@@ -209,17 +209,17 @@ class CacheStorage
      */
     private function processDecompression(CachedItem $cached_item, string $key) : ?CachedItem
     {
-        if ($cached_item->isCompressed && is_string($cached_item->data)) {
+        if ($cached_item->is_compressed && is_string($cached_item->data)) {
             $decompressed_data = @gzuncompress($cached_item->data);
             if ($decompressed_data !== false) {
                 $data = $this->serializer->unserialize($decompressed_data);
                 return new CachedItem(
                     data: $data,
-                    logicalExpireTime: $cached_item->logicalExpireTime,
+                    logical_expire_time: $cached_item->logical_expire_time,
                     version: $cached_item->version,
-                    isCompressed: false,
-                    generationTime: $cached_item->generationTime,
-                    tagVersions: $cached_item->tagVersions
+                    is_compressed: false,
+                    generation_time: $cached_item->generation_time,
+                    tag_versions: $cached_item->tag_versions
                 );
             }
             $this->logger->error('AsyncCache DECOMPRESSION_ERROR', ['key' => $key]);

@@ -34,24 +34,24 @@ use Fyennyi\AsyncCache\Model\CachedItem;
 class CacheContext
 {
     /** @var CachedItem|null Stale item found during lookup (if any) */
-    public ?CachedItem $staleItem = null;
+    public ?CachedItem $stale_item = null;
 
     /** @var float Microtime when the resolution started */
-    public float $startTime;
+    public float $start_time;
 
     /** @var Future|null The final result of the pipeline */
-    public ?Future $resultFuture = null;
+    public ?Future $result_future = null;
 
     /**
      * @param  string        $key             The cache key
-     * @param  mixed         $promiseFactory  Callback to fetch fresh data
+     * @param  mixed         $promise_factory  Callback to fetch fresh data
      * @param  CacheOptions  $options         Resolved caching options
      */
     public function __construct(
         public readonly string $key,
-        public readonly mixed $promiseFactory,
+        public readonly mixed $promise_factory,
         public readonly CacheOptions $options
     ) {
-        $this->startTime = microtime(true);
+        $this->start_time = microtime(true);
     }
 }

@@ -92,12 +92,12 @@ class EncryptingSerializer implements SerializerInterface
             throw new \RuntimeException("Failed to decode base64 data");
         }
 
-        $ivLen = openssl_cipher_iv_length(self::CIPHER);
-        $tagLen = 16; // Standard tag length for GCM
+        $iv_len = openssl_cipher_iv_length(self::CIPHER);
+        $tag_len = 16; // Standard tag length for GCM
 
-        $iv = substr($decoded, 0, $ivLen);
-        $tag = substr($decoded, $ivLen, $tagLen);
-        $ciphertext = substr($decoded, $ivLen + $tagLen);
+        $iv = substr($decoded, 0, $iv_len);
+        $tag = substr($decoded, $iv_len, $tag_len);
+        $ciphertext = substr($decoded, $iv_len + $tag_len);
 
         $plaintext = openssl_decrypt(
             $ciphertext,

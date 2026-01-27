@@ -68,7 +68,7 @@ class SourceFetchMiddleware implements MiddlewareInterface
         $deferred = new Deferred();
 
         try {
-            $source_result = ($context->promiseFactory)();
+            $source_result = ($context->promise_factory)();
             $source_future = PromiseAdapter::toFuture($source_result);
         } catch (\Throwable $e) {
             $deferred->reject($e);
@@ -85,7 +85,7 @@ class SourceFetchMiddleware implements MiddlewareInterface
                 $this->dispatcher?->dispatch(new CacheStatusEvent(
                     $context->key,
                     CacheStatus::Miss,
-                    microtime(true) - $context->startTime,
+                    microtime(true) - $context->start_time,
                     $context->options->tags
                 ));
 

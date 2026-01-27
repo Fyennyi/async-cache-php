@@ -152,14 +152,14 @@ class CacheOptionsBuilder
     /**
      * Configures rate limiting for the request
      *
-     * @param  string  $key         Identifier for rate limit grouping
-     * @param  bool    $serveStale  Whether to return stale data if limited
-     * @return self                 Current builder instance
+     * @param  string  $key          Identifier for rate limit grouping
+     * @param  bool    $serve_stale  Whether to return stale data if limited
+     * @return self                  Current builder instance
      */
-    public function withRateLimit(string $key, bool $serveStale = true) : self
+    public function withRateLimit(string $key, bool $serve_stale = true) : self
     {
         $this->rate_limit_key = $key;
-        $this->serve_stale_if_limited = $serveStale;
+        $this->serve_stale_if_limited = $serve_stale;
         return $this;
     }
 

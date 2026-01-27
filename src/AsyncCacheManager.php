@@ -118,7 +118,7 @@ class AsyncCacheManager
         // Execute the pipeline. The result is a Future from the last middleware.
         return $this->pipeline->send($context, function (CacheContext $ctx) {
             try {
-                $res = ($ctx->promiseFactory)();
+                $res = ($ctx->promise_factory)();
                 return PromiseAdapter::toFuture($res);
             } catch (\Throwable $e) {
                 $deferred = new Deferred();

@@ -38,14 +38,14 @@ use Psr\Log\NullLogger;
 class RetryMiddleware implements MiddlewareInterface
 {
     /**
-     * @param  int                   $maxRetries      Maximum number of retry attempts
-     * @param  int                   $initialDelayMs  Delay before the first retry in milliseconds
-     * @param  float                 $multiplier      Multiplier for exponential backoff
-     * @param  LoggerInterface|null  $logger          Logger for reporting retries
+     * @param  int                   $max_retries       Maximum number of retry attempts
+     * @param  int                   $initial_delay_ms  Delay before the first retry in milliseconds
+     * @param  float                 $multiplier        Multiplier for exponential backoff
+     * @param  LoggerInterface|null  $logger            Logger for reporting retries
      */
     public function __construct(
-        private int $maxRetries = 3,
-        private int $initialDelayMs = 100,
+        private int $max_retries = 3,
+        private int $initial_delay_ms = 100,
         private float $multiplier = 2.0,
         private ?LoggerInterface $logger = null
     ) {
@@ -81,7 +81,7 @@ class RetryMiddleware implements MiddlewareInterface
                 $deferred->resolve($value);
             },
             function ($reason) use ($context, $next, $retries, $deferred) {
-                if ($retries >= $this->maxRetries) {
+                if ($retries >= $this->max_retries) {
                     $this->logger->error('AsyncCache RETRY: Max retries reached', [
                         'key' => $context->key,
                         'retries' => $retries,
@@ -91,17 +91,17 @@ class RetryMiddleware implements MiddlewareInterface
                     return;
                 }
 
-                $delayMs = $this->initialDelayMs * pow($this->multiplier, $retries);
+                $delay_ms = $this->initial_delay_ms * pow($this->multiplier, $retries);
 
                 $this->logger->warning('AsyncCache RETRY: Request failed, retrying...', [
                     'key' => $context->key,
                     'attempt' => $retries + 1,
-                    'delay_ms' => $delayMs,
+                    'delay_ms' => $delay_ms,
                     'reason' => $reason
                 ]);
 
                 // Non-blocking wait
-                Timer::delay($delayMs / 1000)->onResolve(function () use ($context, $next, $retries, $deferred) {
+                Timer::delay($delay_ms / 1000)->onResolve(function () use ($context, $next, $retries, $deferred) {
                     $this->attempt($context, $next, $retries + 1)->onResolve(
                         fn($v) => $deferred->resolve($v),
                         fn($e) => $deferred->reject($e)

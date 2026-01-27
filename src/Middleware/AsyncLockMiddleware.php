@@ -78,11 +78,11 @@ class AsyncLockMiddleware implements MiddlewareInterface
             return $this->handleWithLock($context, $next, $lock_key);
         }
 
-        if ($context->staleItem !== null) {
-            $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, microtime(true) - $context->startTime, $context->options->tags));
-            $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $context->staleItem->data));
+        if ($context->stale_item !== null) {
+            $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, microtime(true) - $context->start_time, $context->options->tags));
+            $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $context->stale_item->data));
             $deferred = new Deferred();
-            $deferred->resolve($context->staleItem->data);
+            $deferred->resolve($context->stale_item->data);
             return $deferred->future();
         }
 
