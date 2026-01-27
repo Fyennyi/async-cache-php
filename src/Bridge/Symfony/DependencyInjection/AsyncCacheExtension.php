@@ -11,6 +11,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\Lock\LockFactory;
 
 /**
  * Dependency injection extension for Symfony
@@ -35,7 +36,7 @@ class AsyncCacheExtension extends Extension
             '$cache_adapter' => new Reference(CacheInterface::class),
             '$rate_limiter' => null, // Expects explicit configuration if needed
             '$logger' => new Reference(LoggerInterface::class),
-            '$lock_provider' => new Reference(LockInterface::class),
+            '$lock_factory' => new Reference(LockFactory::class),
             '$middlewares' => [],
             '$dispatcher' => new Reference(EventDispatcherInterface::class)
         ]);
