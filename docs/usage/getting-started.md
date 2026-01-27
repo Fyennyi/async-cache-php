@@ -32,7 +32,7 @@ The library supports any PSR-16 compliant cache adapter or ReactPHP Cache implem
 
 === "Symfony Filesystem"
 
-    Suitable for persistent caching.
+    Suitable for persistent caching. Requires `symfony/cache` package.
 
     ```php
     use Symfony\Component\Cache\Adapter\FilesystemAdapter;
