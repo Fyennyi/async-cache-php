@@ -42,11 +42,15 @@ class SourceFetchMiddleware implements MiddlewareInterface
 
         $fetchStartTime = microtime(true);
 
-        // We call the factory and wrap the result in our native Future
-        $sourceResult = ($context->promiseFactory)();
-
-        // Use Adapter to bridge from whatever the factory returns (Guzzle/React/Value/Future) to our Future
-        $sourceFuture = \Fyennyi\AsyncCache\Bridge\PromiseAdapter::toFuture($sourceResult);
+        try {
+            // We call the factory and wrap the result in our native Future
+            $sourceResult = ($context->promiseFactory)();
+            $sourceFuture = \Fyennyi\AsyncCache\Bridge\PromiseAdapter::toFuture($sourceResult);
+        } catch (\Throwable $e) {
+            $deferred = new Deferred();
+            $deferred->reject($e);
+            return $deferred->future();
+        }
 
         // Create a new deferred for the "after-save" result
         $finalDeferred = new Deferred();
