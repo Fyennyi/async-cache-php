@@ -32,4 +32,19 @@ class CoalesceMiddlewareTest extends TestCase
         $deferred->resolve('done');
         $this->assertSame('done', await($p1));
     }
+
+    public function testCoalesceHandlesFailure() : void
+    {
+        $middleware = new CoalesceMiddleware();
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
+
+        $deferred = new Deferred();
+        $p1 = $middleware->handle($context, fn () => $deferred->promise());
+
+        $deferred->reject(new \Exception('fail'));
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('fail');
+        await($p1);
+    }
 }

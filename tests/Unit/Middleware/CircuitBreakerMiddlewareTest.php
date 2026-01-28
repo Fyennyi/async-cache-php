@@ -153,4 +153,30 @@ class CircuitBreakerMiddlewareTest extends TestCase
 
         await($this->middleware->handle($context, $next));
     }
+
+    public function testBlocksProbeIfLockBusy() : void
+    {
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
+        $this->storage->method('get')->willReturnMap([
+            ['cb:last_fail:k', 0, time() - 61], // Expired, so HALF-OPEN
+        ]);
+
+        // Mock lock factory to return a lock that fails to acquire
+        $lock = $this->createMock(\Symfony\Component\Lock\SharedLockInterface::class);
+        $lock->method('acquire')->willReturn(false);
+
+        $lf = $this->createMock(\Symfony\Component\Lock\LockFactory::class);
+        $lf->method('createLock')->willReturn($lock);
+
+        // Inject new lock factory
+        $ref = new \ReflectionClass($this->middleware);
+        $prop = $ref->getProperty('lock_factory');
+        $prop->setAccessible(true);
+        $prop->setValue($this->middleware, $lf);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Circuit Breaker is HALF-OPEN');
+
+        await($this->middleware->handle($context, fn () => null));
+    }
 }

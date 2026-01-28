@@ -62,7 +62,8 @@ class SourceFetchMiddleware implements MiddlewareInterface
         try {
             /** @var PromiseInterface<T> $promise */
             $promise = $next($context);
-            $promise->then(
+
+            return $promise->then(
                 function ($data) use ($context, $start) {
                     $generation_time = microtime(true) - $start;
                     $this->dispatcher?->dispatch(new CacheStatusEvent(
@@ -79,14 +80,10 @@ class SourceFetchMiddleware implements MiddlewareInterface
 
                     return $data;
                 }
-            );
-
-            // Catch for the branch created by then() to avoid unhandled rejection logging
-            $promise->catch(function (\Throwable $e) use ($context) {
+            )->catch(function (\Throwable $e) use ($context) {
                 $this->logger->debug('AsyncCache FETCH_PIPELINE_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
+                throw $e;
             });
-
-            return $promise;
         } catch (\Throwable $e) {
             return \React\Promise\reject($e);
         }

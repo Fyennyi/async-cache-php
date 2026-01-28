@@ -10,95 +10,108 @@ use Fyennyi\AsyncCache\Model\CachedItem;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
-use React\Promise\Deferred;
+use Psr\Log\LoggerInterface;
 use function React\Async\await;
 
 class CacheLookupMiddlewareTest extends TestCase
 {
     private MockObject|CacheStorage $storage;
+    private MockObject|LoggerInterface $logger;
     private CacheLookupMiddleware $middleware;
 
     protected function setUp() : void
     {
         $this->storage = $this->createMock(CacheStorage::class);
-        $this->middleware = new CacheLookupMiddleware($this->storage, new NullLogger());
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->middleware = new CacheLookupMiddleware($this->storage, $this->logger);
     }
 
     public function testReturnsCachedDataIfFresh() : void
     {
+        $item = new CachedItem('data', time() + 100);
         $context = new CacheContext('k', fn () => null, new CacheOptions());
-        $item = new CachedItem('val', time() + 100);
-
-        $d = new Deferred();
-        $d->resolve($item);
-        $this->storage->method('get')->willReturn($d->promise());
-
-        // Next should not be called
-        $next = fn () => (new Deferred())->promise();
-
-        $this->assertSame('val', await($this->middleware->handle($context, $next)));
+        $this->storage->method('get')->willReturn(\React\Promise\resolve($item));
+        $this->assertSame('data', await($this->middleware->handle($context, fn () => \React\Promise\resolve(null))));
     }
 
     public function testCallsNextOnCacheMiss() : void
     {
         $context = new CacheContext('k', fn () => null, new CacheOptions());
-
-        $d = new Deferred();
-        $d->resolve(null);
-        $this->storage->method('get')->willReturn($d->promise());
-
-        $next = function () {
-            $d = new Deferred();
-            $d->resolve('fetched');
-
-            return $d->promise();
-        };
-
-        $this->assertSame('fetched', await($this->middleware->handle($context, $next)));
+        $this->storage->method('get')->willReturn(\React\Promise\resolve(null));
+        $next = fn () => \React\Promise\resolve('from_next');
+        $this->assertSame('from_next', await($this->middleware->handle($context, $next)));
     }
 
     public function testBypassesOnForceRefresh() : void
     {
-        $options = new CacheOptions(strategy: CacheStrategy::ForceRefresh);
-        $context = new CacheContext('k', fn () => null, $options);
-
+        $context = new CacheContext('k', fn () => null, new CacheOptions(strategy: CacheStrategy::ForceRefresh));
         $this->storage->expects($this->never())->method('get');
-
-        $next = function () {
-            $d = new Deferred();
-            $d->resolve('fetched');
-
-            return $d->promise();
-        };
-
-        $this->assertSame('fetched', await($this->middleware->handle($context, $next)));
+        $next = fn () => \React\Promise\resolve('bypassed');
+        $this->assertSame('bypassed', await($this->middleware->handle($context, $next)));
     }
 
     public function testBackgroundRefreshReturnsStaleAndCallsNext() : void
     {
-        $options = new CacheOptions(strategy: CacheStrategy::Background);
-        $context = new CacheContext('k', fn () => null, $options);
-
-        // Stale item
-        $item = new CachedItem('stale', time() - 100);
-        $d = new Deferred();
-        $d->resolve($item);
-        $this->storage->method('get')->willReturn($d->promise());
-
-        $called = false;
-        $next = function () use (&$called) {
-            $called = true;
-            $d = new Deferred();
-            $d->resolve('fresh');
-
-            return $d->promise();
+        $item = new CachedItem('stale', time() - 10);
+        $context = new CacheContext('k', fn () => null, new CacheOptions(strategy: CacheStrategy::Background));
+        $this->storage->method('get')->willReturn(\React\Promise\resolve($item));
+        $nextCalled = false;
+        $next = function () use (&$nextCalled) {
+            $nextCalled = true;
+            return \React\Promise\resolve('ignored');
         };
+        $res = await($this->middleware->handle($context, $next));
+        $this->assertSame('stale', $res);
+        $this->assertTrue($nextCalled);
+    }
 
-        // Should return stale data immediately
-        $this->assertSame('stale', await($this->middleware->handle($context, $next)));
+    public function testXFetchTriggered() : void
+    {
+        $item = new CachedItem('data', time() + 1, generation_time: 1.0);
+        $context = new CacheContext('k', fn () => null, new CacheOptions(x_fetch_beta: 1000.0));
+        $this->storage->method('get')->willReturn(\React\Promise\resolve($item));
+        $next = fn () => \React\Promise\resolve('xfetch_triggered');
+        $this->assertSame('xfetch_triggered', await($this->middleware->handle($context, $next)));
+    }
 
-        // But next() should have been called (background fetch)
-        $this->assertTrue($called);
+    public function testProceedsIfItemHasTags() : void
+    {
+        $item = new CachedItem('data', time() + 100, tag_versions: ['t1' => 'v1']);
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
+        $this->storage->method('get')->willReturn(\React\Promise\resolve($item));
+        $next = fn () => \React\Promise\resolve('validated');
+        $this->assertSame('validated', await($this->middleware->handle($context, $next)));
+    }
+
+    public function testHandlesStorageError() : void
+    {
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
+        $this->storage->method('get')->willReturn(\React\Promise\reject(new \Exception('Storage error')));
+        $next = fn () => \React\Promise\resolve('fallback');
+        $this->assertSame('fallback', await($this->middleware->handle($context, $next)));
+    }
+
+    public function testHandlesBackgroundFetchError() : void
+    {
+        $item = new CachedItem('stale', time() - 10);
+        $context = new CacheContext('k', fn () => null, new CacheOptions(strategy: CacheStrategy::Background));
+        $this->storage->method('get')->willReturn(\React\Promise\resolve($item));
+        $next = fn () => \React\Promise\reject(new \Exception('Background fail'));
+        $res = await($this->middleware->handle($context, $next));
+        $this->assertSame('stale', $res);
+    }
+
+    public function testHandlesPipelineErrorLogging() : void
+    {
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
+        $this->storage->method('get')->willReturn(\React\Promise\resolve(null));
+
+        $this->logger->expects($this->atLeastOnce())->method('debug');
+
+        $next = fn () => \React\Promise\reject(new \Exception('Pipeline fail'));
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Pipeline fail');
+        await($this->middleware->handle($context, $next));
     }
 }

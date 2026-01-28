@@ -63,4 +63,19 @@ class PipelineTest extends TestCase
 
         await($future);
     }
+
+    public function testCatchesSyncExceptionInDestination() : void
+    {
+        $pipeline = new Pipeline([]);
+        $context = new CacheContext('key', fn () => 'val', new CacheOptions());
+
+        $future = $pipeline->send($context, function () {
+            throw new \Exception('Destination sync fail');
+        });
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Destination sync fail');
+
+        await($future);
+    }
 }

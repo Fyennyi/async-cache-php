@@ -37,7 +37,6 @@ use React\Promise\Deferred;
 use React\Promise\PromiseInterface;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\LockInterface;
-use function React\Promise\Timer\resolve as delay;
 
 /**
  * Synchronization middleware that prevents race conditions using Symfony Lock.
@@ -96,56 +95,55 @@ class AsyncLockMiddleware implements MiddlewareInterface
         $deferred = new Deferred();
 
         $attempt = function () use (&$attempt, $context, $next, $lock_key, $start_time, $timeout, $deferred) {
-            $lock = $this->lock_factory->createLock($lock_key, 30.0);
+            try {
+                $lock = $this->lock_factory->createLock($lock_key, 30.0);
 
-            if ($lock->acquire(false)) {
-                $this->logger->debug('AsyncCache LOCK_ACQUIRED: async', ['key' => $context->key]);
-                $this->active_locks[$lock_key] = $lock;
+                if ($lock->acquire(false)) {
+                    $this->logger->debug('AsyncCache LOCK_ACQUIRED: async', ['key' => $context->key]);
+                    $this->active_locks[$lock_key] = $lock;
 
-                $this->storage->get($context->key, $context->options)->then(
-                    function ($cached_item) use ($context, $next, $lock_key, $start_time, $deferred) {
-                        if ($cached_item instanceof CachedItem && $cached_item->isFresh()) {
-                            $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, microtime(true) - $start_time, $context->options->tags));
-                            $this->releaseLock($lock_key);
-                            $deferred->resolve($cached_item->data);
+                    $this->storage->get($context->key, $context->options)->then(
+                        function ($cached_item) use ($context, $next, $lock_key, $start_time, $deferred) {
+                            if ($cached_item instanceof CachedItem && $cached_item->isFresh()) {
+                                $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, microtime(true) - $start_time, $context->options->tags));
+                                $this->releaseLock($lock_key);
+                                $deferred->resolve($cached_item->data);
 
-                            return;
+                                return;
+                            }
+
+                            /** @var PromiseInterface<T> $inner_promise */
+                            $inner_promise = $this->handleWithLock($context, $next, $lock_key);
+                            $inner_promise->then(
+                                fn ($v) => $deferred->resolve($v)
+                            )->catch(function (\Throwable $e) use ($deferred) {
+                                $this->logger->error('AsyncCache LOCK_INNER_ERROR: {msg}', ['msg' => $e->getMessage()]);
+                                $deferred->reject($e);
+                            });
                         }
-
-                        /** @var PromiseInterface<T> $inner_promise */
-                        $inner_promise = $this->handleWithLock($context, $next, $lock_key);
-                        $inner_promise->then(
-                            fn ($v) => $deferred->resolve($v),
-                            fn ($e) => $deferred->reject($e)
-                        )->catch(function (\Throwable $e) {
-                            $this->logger->error('AsyncCache LOCK_INNER_ERROR: {msg}', ['msg' => $e->getMessage()]);
-                        });
-                    },
-                    function ($e) use ($lock_key, $deferred) {
+                    )->catch(function (\Throwable $e) use ($context, $lock_key, $deferred) {
+                        $this->logger->error('AsyncCache LOCK_STORAGE_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
                         $this->releaseLock($lock_key);
                         $deferred->reject($e);
-                    }
-                )->catch(function (\Throwable $e) use ($context) {
-                    $this->logger->error('AsyncCache LOCK_STORAGE_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
+                    });
+
+                    return;
+                }
+
+                if (microtime(true) - $start_time >= $timeout) {
+                    $deferred->reject(new \RuntimeException("Could not acquire lock for key: {$context->key} (Timeout)"));
+
+                    return;
+                }
+
+                // Retry after delay
+                \React\Promise\Timer\resolve(0.05)->then(function () use ($attempt) {
+                    $attempt();
                 });
-
-                return;
-            }
-
-            if (microtime(true) - $start_time >= $timeout) {
-                $deferred->reject(new \RuntimeException("Could not acquire lock for key: {$context->key} (Timeout)"));
-
-                return;
-            }
-
-            // Retry after delay
-            delay(0.05)->then(function () use ($attempt) {
-                $attempt();
-            }, function ($e) use ($deferred) {
-                $deferred->reject($e);
-            })->catch(function (\Throwable $e) {
+            } catch (\Throwable $e) {
                 $this->logger->error('AsyncCache LOCK_RETRY_ERROR: {msg}', ['msg' => $e->getMessage()]);
-            });
+                $deferred->reject($e);
+            }
         };
 
         $attempt();

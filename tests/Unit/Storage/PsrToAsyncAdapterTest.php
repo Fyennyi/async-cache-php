@@ -48,4 +48,42 @@ class PsrToAsyncAdapterTest extends TestCase
         $this->psr->expects($this->once())->method('clear')->willReturn(true);
         $this->assertTrue(await($this->adapter->clear()));
     }
+
+    public function testMethodsCatchException() : void
+    {
+        $this->psr->method('get')->willThrowException(new \Exception('PSR error'));
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('PSR error');
+
+        await($this->adapter->get('k'));
+    }
+
+    public function testGetMultipleCatchException() : void
+    {
+        $this->psr->method('getMultiple')->willThrowException(new \Exception('PSR error'));
+        $this->expectException(\Exception::class);
+        await($this->adapter->getMultiple(['k']));
+    }
+
+    public function testSetCatchException() : void
+    {
+        $this->psr->method('set')->willThrowException(new \Exception('PSR error'));
+        $this->expectException(\Exception::class);
+        await($this->adapter->set('k', 'v'));
+    }
+
+    public function testDeleteCatchException() : void
+    {
+        $this->psr->method('delete')->willThrowException(new \Exception('PSR error'));
+        $this->expectException(\Exception::class);
+        await($this->adapter->delete('k'));
+    }
+
+    public function testClearCatchException() : void
+    {
+        $this->psr->method('clear')->willThrowException(new \Exception('PSR error'));
+        $this->expectException(\Exception::class);
+        await($this->adapter->clear());
+    }
 }

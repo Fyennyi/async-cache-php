@@ -60,14 +60,7 @@ class AsyncCacheManagerTest extends TestCase
         $data = 'cached_data';
         $options = new CacheOptions(ttl: 60);
 
-        // Mock cache hit via PSR adapter (CacheStorage calls adapter->get)
-        // Note: CacheStorage wraps result in CachedItem.
-        // Since we mock PSR cache, PsrToAsyncAdapter returns whatever PSR returns.
-        // CacheStorage expects either CachedItem object or array ['d' => ..., 'e' => ...].
-
         $cachedItem = new CachedItem($data, time() + 100);
-        // We simulate that the underlying cache returns a serialized version or object depending on adapter.
-        // PsrToAsyncAdapter just passes value through.
 
         $this->cache->expects($this->once())
             ->method('get')
@@ -86,7 +79,6 @@ class AsyncCacheManagerTest extends TestCase
         $newData = 'new_data';
         $options = new CacheOptions(ttl: 60);
 
-        // 1. Cache lookup
         $this->cache->expects($this->once())->method('get')->with($key)->willReturn(null);
 
         $promise = $this->manager->wrap($key, fn () => $newData, $options);
@@ -101,17 +93,7 @@ class AsyncCacheManagerTest extends TestCase
         $newData = 'fresh_data';
         $options = new CacheOptions(ttl: 60, strategy: CacheStrategy::ForceRefresh);
 
-        // Should NOT check cache for get (strategy bypasses lookup)
-        // But might check for lock/etc. Actually CacheLookupMiddleware handles ForceRefresh by calling next() immediately.
-        // So adapter->get should NOT be called by CacheLookupMiddleware.
-
-        // Wait, CacheLookupMiddleware does: if (ForceRefresh) return next($context).
-        // So get() is skipped.
-
-        // Then SourceFetchMiddleware calls factory and sets cache.
         $this->cache->expects($this->once())->method('set');
-
-        // Ensure get is never called (except maybe by other middlewares? No)
         $this->cache->expects($this->never())->method('get');
 
         $promise = $this->manager->wrap($key, fn () => $newData, $options);
@@ -129,7 +111,6 @@ class AsyncCacheManagerTest extends TestCase
         $promise = $this->manager->clear();
         $result = await($promise);
 
-        // The adapter result (true) is returned
         $this->assertTrue($result);
     }
 
@@ -234,5 +215,84 @@ class AsyncCacheManagerTest extends TestCase
         $tags = ['tag1','tag2'];
         $cache->expects($this->exactly(2))->method('set')->with($this->stringStartsWith('tag_v:'));
         $this->assertTrue(await($mgr->invalidateTags($tags)));
+    }
+
+    public function testClearAndRateLimiter() : void
+    {
+        $this->rateLimiter->expects($this->once())->method('reset');
+        $this->manager->clearRateLimiter();
+        $this->assertSame($this->rateLimiter, $this->manager->getRateLimiter());
+    }
+
+    public function testConstructorWrappers() : void
+    {
+        $psr = $this->createMock(CacheInterface::class);
+        $mgr = new AsyncCacheManager($psr);
+        $this->assertInstanceOf(AsyncCacheManager::class, $mgr);
+
+        $react = $this->createMock(\React\Cache\CacheInterface::class);
+        $mgr2 = new AsyncCacheManager($react);
+        $this->assertInstanceOf(AsyncCacheManager::class, $mgr2);
+    }
+
+    public function testIncrementHandlesGetFailure() : void
+    {
+        // Use fail_safe: false to ensure the promise is rejected on error
+        $options = new CacheOptions(fail_safe: false);
+        $this->cache->method('get')->willThrowException(new \Exception('Get fail'));
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Get fail');
+
+        await($this->manager->increment('k', 1, $options));
+    }
+
+    public function testIncrementHandlesSetFailure() : void
+    {
+        $this->cache->method('get')->willReturn(null);
+        // PsrToAsyncAdapter will convert sync exception to rejected promise
+        $this->cache->method('set')->willThrowException(new \Exception('Set fail'));
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Set fail');
+
+        await($this->manager->increment('k'));
+    }
+
+    public function testIncrementHandlesProcessingThrowable() : void
+    {
+        $serializer = $this->createMock(\Fyennyi\AsyncCache\Serializer\SerializerInterface::class);
+        // Throwing in serialize() will trigger the catch (\Throwable $e) block in increment()
+        $serializer->method('serialize')->willThrowException(new \Error('Sync fail'));
+
+        $mgr = new AsyncCacheManager($this->cache, serializer: $serializer);
+        $this->cache->method('get')->willReturn(null);
+
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Sync fail');
+
+        // Compression: true triggers the serializer call in CacheStorage::set
+        await($mgr->increment('k', 1, new CacheOptions(compression: true)));
+    }
+
+    public function testIncrementRetriesIfLockBusy() : void
+    {
+        $key = 'k';
+        $lock = $this->createMock(\Symfony\Component\Lock\SharedLockInterface::class);
+        $lockFactory = $this->createMock(\Symfony\Component\Lock\LockFactory::class);
+        $lockFactory->method('createLock')->willReturn($lock);
+
+        // First call returns false (busy), second call returns true (acquired)
+        $lock->expects($this->exactly(2))
+            ->method('acquire')
+            ->willReturnOnConsecutiveCalls(false, true);
+
+        $this->cache->method('get')->willReturn(null);
+        $this->cache->method('set')->willReturn(true);
+
+        $mgr = new AsyncCacheManager($this->cache, lock_factory: $lockFactory);
+
+        $res = await($mgr->increment($key, 1));
+        $this->assertSame(1, $res);
     }
 }

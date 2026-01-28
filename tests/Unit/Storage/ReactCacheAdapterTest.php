@@ -43,4 +43,16 @@ class ReactCacheAdapterTest extends TestCase
         }));
         $this->assertTrue(await($this->adapter->delete('k')));
     }
+
+    public function testGetMultiple() : void
+    {
+        $this->react->expects($this->once())->method('getMultiple')->with(['k'])->willReturn(\React\Promise\resolve(['k' => 'v']));
+        $this->assertSame(['k' => 'v'], await($this->adapter->getMultiple(['k'])));
+    }
+
+    public function testClear() : void
+    {
+        $this->react->expects($this->once())->method('clear')->willReturn(\React\Promise\resolve(true));
+        $this->assertTrue(await($this->adapter->clear()));
+    }
 }

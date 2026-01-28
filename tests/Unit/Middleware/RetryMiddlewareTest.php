@@ -34,4 +34,21 @@ class RetryMiddlewareTest extends TestCase
         $this->assertSame('ok', $res);
         $this->assertSame(2, $failCount);
     }
+
+    public function testRetryMiddlewareExhaustsRetries() : void
+    {
+        $middleware = new RetryMiddleware(max_retries: 2, initial_delay_ms: 10, logger: new NullLogger());
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
+
+        $failCount = 0;
+        $next = function () use (&$failCount) {
+            $failCount++;
+            return \React\Promise\reject(new \Exception("Fail $failCount"));
+        };
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Fail 3');
+
+        await($middleware->handle($context, $next));
+    }
 }
