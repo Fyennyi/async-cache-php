@@ -16,7 +16,7 @@ use Symfony\Component\RateLimiter\LimiterInterface;
 
 class AsyncCacheBuilderTest extends TestCase
 {
-    public function testBuildsManagerWithDefaults(): void
+    public function testBuildsManagerWithDefaults() : void
     {
         $cache = $this->createMock(CacheInterface::class);
         $manager = AsyncCacheBuilder::create($cache)->build();
@@ -24,7 +24,7 @@ class AsyncCacheBuilderTest extends TestCase
         $this->assertInstanceOf(AsyncCacheManager::class, $manager);
     }
 
-    public function testBuildsManagerWithCustomDependencies(): void
+    public function testBuildsManagerWithCustomDependencies() : void
     {
         $cache = $this->createMock(CacheInterface::class);
         $limiter = $this->createMock(LimiterInterface::class);

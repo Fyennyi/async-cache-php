@@ -7,7 +7,7 @@ use PHPUnit\Framework\TestCase;
 
 class RateLimitExceptionTest extends TestCase
 {
-    public function testMessageIncludesKey(): void
+    public function testMessageIncludesKey() : void
     {
         $key = 'my_test_key';
         $exception = new RateLimitException($key);

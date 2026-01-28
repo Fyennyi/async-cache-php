@@ -10,6 +10,7 @@ use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\SharedLockInterface;
+use function React\Async\await;
 
 class AsyncCacheManagerExtendedTest extends TestCase
 {
@@ -17,7 +18,7 @@ class AsyncCacheManagerExtendedTest extends TestCase
     private MockObject|LockFactory $lockFactory;
     private AsyncCacheManager $manager;
 
-    protected function setUp(): void
+    protected function setUp() : void
     {
         $this->cache = $this->createMock(CacheInterface::class);
         $this->lockFactory = $this->createMock(LockFactory::class);
@@ -30,7 +31,7 @@ class AsyncCacheManagerExtendedTest extends TestCase
         );
     }
 
-    public function testIncrementAcquiresLockAndUpdatesValue(): void
+    public function testIncrementAcquiresLockAndUpdatesValue() : void
     {
         $key = 'counter';
         $lock = $this->createMock(SharedLockInterface::class);
@@ -58,13 +59,11 @@ class AsyncCacheManagerExtendedTest extends TestCase
             }))
             ->willReturn(true);
 
-        $future = $this->manager->increment($key, 1);
-        $result = $future->wait();
-
+        $result = await($this->manager->increment($key, 1));
         $this->assertSame(11, $result);
     }
 
-    public function testIncrementInitializesValueIfMissing(): void
+    public function testIncrementInitializesValueIfMissing() : void
     {
         $key = 'counter';
         $lock = $this->createMock(SharedLockInterface::class);
@@ -80,10 +79,10 @@ class AsyncCacheManagerExtendedTest extends TestCase
             ->with($key, $this->callback(fn ($i) => 1 === $i->data))
             ->willReturn(true);
 
-        $this->assertSame(1, $this->manager->increment($key)->wait());
+        $this->assertSame(1, await($this->manager->increment($key)));
     }
 
-    public function testDecrement(): void
+    public function testDecrement() : void
     {
         $key = 'counter';
         $lock = $this->createMock(SharedLockInterface::class);
@@ -97,10 +96,10 @@ class AsyncCacheManagerExtendedTest extends TestCase
             ->with($key, $this->callback(fn ($i) => 5 === $i->data))
             ->willReturn(true);
 
-        $this->assertSame(5, $this->manager->decrement($key, 5)->wait());
+        $this->assertSame(5, await($this->manager->decrement($key, 5)));
     }
 
-    public function testInvalidateTags(): void
+    public function testInvalidateTags() : void
     {
         // CacheStorage implementation of invalidateTags loops through tags and sets versions
         // Since we wrap PSR cache, PsrToAsyncAdapter calls set()
@@ -111,6 +110,6 @@ class AsyncCacheManagerExtendedTest extends TestCase
             ->method('set')
             ->with($this->stringStartsWith('tag_v:'));
 
-        $this->assertTrue($this->manager->invalidateTags($tags)->wait());
+        $this->assertTrue(await($this->manager->invalidateTags($tags)));
     }
 }

@@ -20,16 +20,17 @@ use Fyennyi\AsyncCache\Storage\AsyncCacheAdapterInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\SharedLockInterface;
+use function React\Async\await;
 
 class AsyncCacheManagerTimeoutTest extends TestCase
 {
-    protected function tearDown(): void
+    protected function tearDown() : void
     {
         $GLOBALS['mock_microtime_timeout'] = false;
         unset($GLOBALS['mock_microtime_value']);
     }
 
-    public function testIncrementTimeout(): void
+    public function testIncrementTimeout() : void
     {
         $adapter = $this->createMock(AsyncCacheAdapterInterface::class);
         $lock = $this->createMock(SharedLockInterface::class);
@@ -46,6 +47,6 @@ class AsyncCacheManagerTimeoutTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Could not acquire lock for incrementing key');
 
-        $mgr->increment('k')->wait();
+        await($mgr->increment('k'));
     }
 }

@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 
 class CacheOptionsBuilderTest extends TestCase
 {
-    public function testBuildsWithDefaults(): void
+    public function testBuildsWithDefaults() : void
     {
         $options = CacheOptionsBuilder::create()->build();
 
@@ -17,7 +17,7 @@ class CacheOptionsBuilderTest extends TestCase
         $this->assertSame(3600, $options->ttl);
     }
 
-    public function testBuildsWithCustomValues(): void
+    public function testBuildsWithCustomValues() : void
     {
         $options = CacheOptionsBuilder::create()
             ->withTtl(60)
@@ -42,7 +42,7 @@ class CacheOptionsBuilderTest extends TestCase
         $this->assertSame(CacheStrategy::Strict, $options->strategy);
     }
 
-    public function testStrategyHelpers(): void
+    public function testStrategyHelpers() : void
     {
         $options1 = CacheOptionsBuilder::create()->withBackgroundRefresh()->build();
         $this->assertSame(CacheStrategy::Background, $options1->strategy);
