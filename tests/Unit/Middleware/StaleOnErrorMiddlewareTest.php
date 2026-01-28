@@ -4,53 +4,15 @@ namespace Tests\Unit\Middleware;
 
 use Fyennyi\AsyncCache\CacheOptions;
 use Fyennyi\AsyncCache\Core\CacheContext;
-use Fyennyi\AsyncCache\Middleware\SourceFetchMiddleware;
 use Fyennyi\AsyncCache\Middleware\StaleOnErrorMiddleware;
 use Fyennyi\AsyncCache\Model\CachedItem;
-use Fyennyi\AsyncCache\Storage\CacheStorage;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use React\Promise\Deferred;
 use function React\Async\await;
 
-class AdditionalMiddlewareTest extends TestCase
+class StaleOnErrorMiddlewareTest extends TestCase
 {
-    public function testSourceFetchFetchesAndCaches() : void
-    {
-        $storage = $this->createMock(CacheStorage::class);
-        $middleware = new SourceFetchMiddleware($storage, new NullLogger());
-
-        $context = new CacheContext('k', fn () => 'fresh', new CacheOptions());
-
-        $storage->expects($this->once())
-            ->method('set')
-            ->with('k', 'fresh')
-            ->willReturn((new Deferred())->promise()); // set returns Promise
-
-        $res = await($middleware->handle($context, function () {
-            return \React\Promise\resolve('fresh');
-        }));
-
-        $this->assertSame('fresh', $res);
-    }
-
-    public function testSourceFetchHandlesException() : void
-    {
-        $storage = $this->createMock(CacheStorage::class);
-        $middleware = new SourceFetchMiddleware($storage, new NullLogger());
-
-        $context = new CacheContext('k', fn () => throw new \Exception('oops'), new CacheOptions());
-
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('oops');
-
-        await($middleware->handle($context, function () {
-            return \React\Promise\reject(new \Exception('oops'));
-        }));
-
-
-    }
-
     public function testStaleOnErrorReturnsStaleOnFailure() : void
     {
         $middleware = new StaleOnErrorMiddleware(new NullLogger());
@@ -61,7 +23,6 @@ class AdditionalMiddlewareTest extends TestCase
         $next = function () {
             $d = new Deferred();
             $d->reject(new \Exception('fail'));
-
             return $d->promise();
         };
 
@@ -79,7 +40,6 @@ class AdditionalMiddlewareTest extends TestCase
         $next = function () {
             $d = new Deferred();
             $d->reject(new \Exception('fail'));
-
             return $d->promise();
         };
 

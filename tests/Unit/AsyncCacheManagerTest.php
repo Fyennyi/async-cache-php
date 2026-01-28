@@ -1,11 +1,24 @@
 <?php
 
+namespace Fyennyi\AsyncCache; // shadow namespace for microtime override
+
+function microtime($as_float = false)
+{
+    if ($as_float && !empty($GLOBALS['mock_microtime_timeout'])) {
+        $val = $GLOBALS['mock_microtime_value'] ?? 2000000000.0;
+        $GLOBALS['mock_microtime_value'] = $val + 10.0; // advance time by 10s per call (instantly trigger timeout)
+        return $val;
+    }
+    return \microtime($as_float);
+}
+
 namespace Tests\Unit;
 
 use Fyennyi\AsyncCache\AsyncCacheManager;
 use Fyennyi\AsyncCache\CacheOptions;
 use Fyennyi\AsyncCache\Enum\CacheStrategy;
 use Fyennyi\AsyncCache\Model\CachedItem;
+use Fyennyi\AsyncCache\Storage\AsyncCacheAdapterInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -17,6 +30,11 @@ use function React\Async\await;
 
 class AsyncCacheManagerTest extends TestCase
 {
+    protected function tearDown() : void
+    {
+        $GLOBALS['mock_microtime_timeout'] = false;
+        unset($GLOBALS['mock_microtime_value']);
+    }
     private MockObject|CacheInterface $cache;
     private MockObject|LimiterInterface $rateLimiter;
     private LockFactory $lockFactory;
@@ -128,5 +146,93 @@ class AsyncCacheManagerTest extends TestCase
         $result = await($promise);
 
         $this->assertTrue($result);
+    }
+
+    public function testIncrementTimeout() : void
+    {
+        // Create isolated mocks to simulate timeout behavior for increment()
+        $adapter = $this->createMock(AsyncCacheAdapterInterface::class);
+        $lock = $this->createMock('\Symfony\Component\Lock\SharedLockInterface');
+        $lockFactory = $this->createMock(LockFactory::class);
+
+        $lockFactory->method('createLock')->willReturn($lock);
+        // First call to acquire(false) simulates timeout
+        $lock->method('acquire')->willReturn(false);
+
+        // Enable sped-up microtime for this timeout test
+        $GLOBALS['mock_microtime_timeout'] = true;
+        $mgr = new AsyncCacheManager($adapter, lock_factory: $lockFactory);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Could not acquire lock for incrementing key');
+
+        await($mgr->increment('k'));
+    }
+    public function testIncrementAcquiresLockAndUpdatesValue() : void
+    {
+        $key = 'counter';
+        $cache = $this->createMock(CacheInterface::class);
+        $lockFactory = $this->createMock(LockFactory::class);
+        $lock = $this->createMock('\Symfony\Component\Lock\SharedLockInterface');
+        $lockFactory->method('createLock')->with('lock:counter:' . $key)->willReturn($lock);
+        $lock->method('acquire')->willReturn(true);
+
+        $cache->expects($this->once())->method('get')->with($key)->willReturn(new CachedItem(10, time() + 3600));
+        $cache->expects($this->once())->method('set')->with($key, $this->callback(function ($item) {
+            return $item instanceof CachedItem && 11 === $item->data;
+        }))->willReturn(true);
+
+        $mgr = new AsyncCacheManager(cache_adapter: $cache, rate_limiter: null, logger: new NullLogger(), lock_factory: $lockFactory);
+        $result = await($mgr->increment($key, 1));
+        $this->assertSame(11, $result);
+    }
+
+    public function testIncrementInitializesValueIfMissing() : void
+    {
+        $key = 'counter';
+        $cache = $this->createMock(CacheInterface::class);
+        $lockFactory = $this->createMock(LockFactory::class);
+        $lock = $this->createMock('\Symfony\Component\Lock\SharedLockInterface');
+        $lockFactory->method('createLock')->with('lock:counter:' . $key)->willReturn($lock);
+        $lock->method('acquire')->willReturn(true);
+
+        $cache->method('get')->with($key)->willReturn(null);
+        $cache->expects($this->once())->method('set')->with($key, $this->callback(function ($item) {
+            return $item instanceof CachedItem && 1 === $item->data;
+        }))->willReturn(true);
+
+        $mgr = new AsyncCacheManager(cache_adapter: $cache, rate_limiter: null, logger: new NullLogger(), lock_factory: $lockFactory);
+        $result = await($mgr->increment($key));
+        $this->assertSame(1, $result);
+    }
+
+    public function testDecrement() : void
+    {
+        $key = 'counter';
+        $cache = $this->createMock(CacheInterface::class);
+        $lockFactory = $this->createMock(LockFactory::class);
+        $lock = $this->createMock('\Symfony\Component\Lock\SharedLockInterface');
+        $lockFactory->method('createLock')->with('lock:counter:' . $key)->willReturn($lock);
+        $lock->method('acquire')->willReturn(true);
+
+        $cache->method('get')->with($key)->willReturn(new CachedItem(10, time() + 3600));
+        $cache->expects($this->once())->method('set')->with($key, $this->callback(function ($item) {
+            return $item instanceof CachedItem && 5 === $item->data;
+        }))->willReturn(true);
+
+        $mgr = new AsyncCacheManager(cache_adapter: $cache, rate_limiter: null, logger: new NullLogger(), lock_factory: $lockFactory);
+        $result = await($mgr->decrement($key, 5));
+        $this->assertSame(5, $result);
+    }
+
+    public function testInvalidateTags() : void
+    {
+        $cache = $this->createMock(CacheInterface::class);
+        $lockFactory = $this->createMock(LockFactory::class);
+        $mgr = new AsyncCacheManager(cache_adapter: $cache, rate_limiter: null, logger: new NullLogger(), lock_factory: $lockFactory);
+
+        $tags = ['tag1','tag2'];
+        $cache->expects($this->exactly(2))->method('set')->with($this->stringStartsWith('tag_v:'));
+        $this->assertTrue(await($mgr->invalidateTags($tags)));
     }
 }
