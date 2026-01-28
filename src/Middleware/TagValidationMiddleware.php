@@ -79,9 +79,14 @@ class TagValidationMiddleware implements MiddlewareInterface
 
             // Tags are valid. If the item is fresh, we can return it now.
             if ($item->isFresh()) {
-                return $item->data;
+                return \React\Promise\resolve($item->data);
             }
 
+            return $next($context);
+        }, function (\Throwable $e) use ($context, $next) {
+            $this->logger->error('AsyncCache TAG_FETCH_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
+            // On tag fetch error, we conservatively treat as stale/invalid
+            $context->stale_item = null;
             return $next($context);
         });
     }

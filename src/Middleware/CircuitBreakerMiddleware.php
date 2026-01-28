@@ -30,7 +30,6 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
 use React\Promise\PromiseInterface;
-use function React\Promise\reject;
 
 /**
  * Middleware that prevents cascading failures by stopping requests to failing services
@@ -80,7 +79,7 @@ class CircuitBreakerMiddleware implements MiddlewareInterface
 
             if (time() - $last_failure_time < $this->retry_timeout) {
                 $this->logger->error('AsyncCache CIRCUIT_BREAKER: Open state, blocking request', ['key' => $context->key]);
-                return reject(new \RuntimeException("Circuit Breaker is OPEN for key: {$context->key}"));
+                return \React\Promise\reject(new \RuntimeException("Circuit Breaker is OPEN for key: {$context->key}"));
             }
 
             // Timeout passed, move to half-open

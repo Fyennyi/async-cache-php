@@ -98,7 +98,10 @@ class RetryMiddleware implements MiddlewareInterface
                 // Non-blocking wait then retry
                 return delay($delay_ms / 1000)->then(
                     fn() => $this->attempt($context, $next, $retries + 1)
-                );
+                )->catch(function(\Throwable $e) use ($context) {
+                    $this->logger->error('AsyncCache RETRY_DELAY_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
+                    throw $e;
+                });
             }
         );
     }

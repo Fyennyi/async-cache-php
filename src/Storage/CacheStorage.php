@@ -30,12 +30,10 @@ use Fyennyi\AsyncCache\Model\CachedItem;
 use Fyennyi\AsyncCache\Serializer\PhpSerializer;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Psr\Log\LoggerInterface;
-use function React\Promise\all;
 use React\Promise\PromiseInterface;
-use function React\Promise\resolve;
 
 /**
- * Service responsible for asynchronous interactions with the cache adapter
+ * High-level storage orchestrator that manages serialization and tag metadata
  */
 class CacheStorage
 {
@@ -147,7 +145,7 @@ class CacheStorage
     public function invalidateTags(array $tags) : PromiseInterface
     {
         if (empty($tags)) {
-            return resolve(true);
+            return \React\Promise\resolve(true);
         }
 
         $promises = [];
@@ -199,7 +197,7 @@ class CacheStorage
     public function fetchTagVersions(array $tags, bool $create_missing = false) : PromiseInterface
     {
         if (empty($tags)) {
-            return resolve([]);
+            return \React\Promise\resolve([]);
         }
 
         $keys = array_map(fn($t) => self::TAG_PREFIX . $t, $tags);

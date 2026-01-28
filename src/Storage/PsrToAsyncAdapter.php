@@ -27,8 +27,6 @@ namespace Fyennyi\AsyncCache\Storage;
 
 use Psr\SimpleCache\CacheInterface as PsrCacheInterface;
 use React\Promise\PromiseInterface;
-use function React\Promise\reject;
-use function React\Promise\resolve;
 
 /**
  * Wraps a synchronous PSR-16 cache to act as an asynchronous adapter
@@ -46,9 +44,9 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
     public function get(string $key) : PromiseInterface
     {
         try {
-            return resolve($this->psr_cache->get($key));
+            return \React\Promise\resolve($this->psr_cache->get($key));
         } catch (\Throwable $e) {
-            return reject($e);
+            return \React\Promise\reject($e);
         }
     }
 
@@ -60,9 +58,9 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
     public function getMultiple(iterable $keys) : PromiseInterface
     {
         try {
-            return resolve($this->psr_cache->getMultiple($keys));
+            return \React\Promise\resolve($this->psr_cache->getMultiple($keys));
         } catch (\Throwable $e) {
-            return reject($e);
+            return \React\Promise\reject($e);
         }
     }
 
@@ -72,9 +70,9 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
     public function set(string $key, mixed $value, ?int $ttl = null) : PromiseInterface
     {
         try {
-            return resolve($this->psr_cache->set($key, $value, $ttl));
+            return \React\Promise\resolve($this->psr_cache->set($key, $value, $ttl));
         } catch (\Throwable $e) {
-            return reject($e);
+            return \React\Promise\reject($e);
         }
     }
 
@@ -84,9 +82,9 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
     public function delete(string $key) : PromiseInterface
     {
         try {
-            return resolve($this->psr_cache->delete($key));
+            return \React\Promise\resolve($this->psr_cache->delete($key));
         } catch (\Throwable $e) {
-            return reject($e);
+            return \React\Promise\reject($e);
         }
     }
 
@@ -96,9 +94,9 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
     public function clear() : PromiseInterface
     {
         try {
-            return resolve($this->psr_cache->clear());
+            return \React\Promise\resolve($this->psr_cache->clear());
         } catch (\Throwable $e) {
-            return reject($e);
+            return \React\Promise\reject($e);
         }
     }
 }

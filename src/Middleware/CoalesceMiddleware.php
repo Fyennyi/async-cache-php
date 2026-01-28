@@ -26,6 +26,8 @@
 namespace Fyennyi\AsyncCache\Middleware;
 
 use Fyennyi\AsyncCache\Core\CacheContext;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use React\Promise\PromiseInterface;
 
 /**
@@ -37,19 +39,35 @@ class CoalesceMiddleware implements MiddlewareInterface
     private array $pending = [];
 
     /**
+     * @param  LoggerInterface|null  $logger  Logging implementation
+     */
+    public function __construct(
+        private ?LoggerInterface $logger = null
+    ) {
+        $this->logger = $this->logger ?? new NullLogger();
+    }
+
+    /**
      * @inheritDoc
      */
     public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
         if (isset($this->pending[$context->key])) {
+            $this->logger->debug('AsyncCache COALESCE_HIT: returning existing promise', ['key' => $context->key]);
             return $this->pending[$context->key];
         }
 
         $promise = $next($context);
+
         $this->pending[$context->key] = $promise;
 
         $promise->finally(function () use ($context) {
             unset($this->pending[$context->key]);
+        })->catch(function (\Throwable $e) use ($context) {
+            $this->logger->debug('AsyncCache COALESCE_ERROR: pending request failed', [
+                'key' => $context->key,
+                'msg' => $e->getMessage()
+            ]);
         });
 
         return $promise;

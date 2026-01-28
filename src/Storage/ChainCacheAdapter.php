@@ -29,7 +29,6 @@ use Psr\SimpleCache\CacheInterface as PsrCacheInterface;
 use React\Cache\CacheInterface as ReactCacheInterface;
 use function React\Promise\all;
 use React\Promise\PromiseInterface;
-use function React\Promise\resolve;
 
 /**
  * Asynchronous adapter that chains multiple cache layers (L1, L2, L3...)
@@ -76,7 +75,7 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
     private function resolveLayer(string $key, int $index) : PromiseInterface
     {
         if (! isset($this->adapters[$index])) {
-            return resolve(null);
+            return \React\Promise\resolve(null);
         }
 
         return $this->adapters[$index]->get($key)->then(
@@ -113,7 +112,7 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
         $keys_array = is_array($keys) ? $keys : iterator_to_array($keys);
 
         if (empty($keys_array)) {
-            return resolve([]);
+            return \React\Promise\resolve([]);
         }
 
         foreach ($keys_array as $key) {
@@ -134,7 +133,7 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
     public function set(string $key, mixed $value, ?int $ttl = null) : PromiseInterface
     {
         if (empty($this->adapters)) {
-            return resolve(true);
+            return \React\Promise\resolve(true);
         }
 
         $promises = [];
@@ -154,7 +153,7 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
     public function delete(string $key) : PromiseInterface
     {
         if (empty($this->adapters)) {
-            return resolve(true);
+            return \React\Promise\resolve(true);
         }
 
         $promises = [];
@@ -173,7 +172,7 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
     public function clear() : PromiseInterface
     {
         if (empty($this->adapters)) {
-            return resolve(true);
+            return \React\Promise\resolve(true);
         }
 
         $promises = [];

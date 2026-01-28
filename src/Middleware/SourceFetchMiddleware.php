@@ -25,7 +25,6 @@
 
 namespace Fyennyi\AsyncCache\Middleware;
 
-use Fyennyi\AsyncCache\Bridge\PromiseAdapter;
 use Fyennyi\AsyncCache\Core\CacheContext;
 use Fyennyi\AsyncCache\Enum\CacheStatus;
 use Fyennyi\AsyncCache\Event\CacheMissEvent;
@@ -56,18 +55,38 @@ class SourceFetchMiddleware implements MiddlewareInterface
         $this->dispatcher?->dispatch(new CacheMissEvent($context->key));
 
         $start = microtime(true);
-        $factory = $context->promise_factory;
 
-        return PromiseAdapter::toPromise($factory())->then(
-            function ($data) use ($context, $start) {
-                $generation_time = microtime(true) - $start;
-                $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Miss, microtime(true) - $context->start_time, $context->options->tags));
+        try {
+            $promise = $next($context)->then(
+                function ($data) use ($context, $start) {
+                    $generation_time = microtime(true) - $start;
+                    $this->dispatcher?->dispatch(new CacheStatusEvent(
+                        $context->key,
+                        CacheStatus::Miss,
+                        microtime(true) - $context->start_time,
+                        $context->options->tags
+                    ));
 
-                // Background persistence
-                $this->storage->set($context->key, $data, $context->options, $generation_time);
+                    // Background persistence - handle errors to avoid breaking the response
+                    $this->storage->set($context->key, $data, $context->options, $generation_time)->catch(function(\Throwable $e) use ($context) {
+                        $this->logger->error('AsyncCache PERSISTENCE_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
+                    });
 
-                return $data;
-            }
-        );
+                    return $data;
+                },
+                function (\Throwable $e) {
+                    throw $e;
+                }
+            );
+
+            // Catch for the branch created by then() to avoid unhandled rejection logging
+            $promise->catch(function(\Throwable $e) use ($context) {
+                $this->logger->debug('AsyncCache FETCH_PIPELINE_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
+            });
+
+            return $promise;
+        } catch (\Throwable $e) {
+            return \React\Promise\reject($e);
+        }
     }
 }

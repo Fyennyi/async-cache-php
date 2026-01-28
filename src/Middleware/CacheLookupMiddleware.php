@@ -69,7 +69,7 @@ class CacheLookupMiddleware implements MiddlewareInterface
             return $next($context);
         }
 
-        return $this->storage->get($context->key, $context->options)->then(
+        $promise = $this->storage->get($context->key, $context->options)->then(
             function ($cached_item) use ($context, $next) {
                 if ($cached_item instanceof CachedItem) {
                     $context->stale_item = $cached_item;
@@ -91,27 +91,37 @@ class CacheLookupMiddleware implements MiddlewareInterface
 
                         // If item has tags, we MUST continue to TagValidationMiddleware
                         if (! empty($cached_item->tag_versions)) {
-                            return $next($context)->then(function($res) use ($cached_item) {
-                                // If subsequent middleware (TagValidation) cleared the stale_item or returned a new result, use it
-                                // otherwise return the fresh data we found.
-                                return $res;
-                            });
+                            return $next($context);
                         }
 
-                        return $cached_item->data;
+                        return \React\Promise\resolve($cached_item->data);
                     }
 
                     if ($context->options->strategy === CacheStrategy::Background) {
                         $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, microtime(true) - $context->start_time, $context->options->tags));
                         $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $cached_item->data));
-                        $next($context);
 
-                        return $cached_item->data;
+                        // Background fetch - catch errors to prevent unhandled rejection since this promise is not returned
+                        $next($context)->catch(function(\Throwable $e) {
+                            $this->logger->error('AsyncCache BACKGROUND_FETCH_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
+                        });
+
+                        return \React\Promise\resolve($cached_item->data);
                     }
                 }
 
                 return $next($context);
+            },
+            function (\Throwable $e) use ($context, $next) {
+                $this->logger->error('AsyncCache CACHE_LOOKUP_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
+                return $next($context);
             }
         );
+
+        $promise->catch(function(\Throwable $e) use ($context) {
+            $this->logger->debug('AsyncCache LOOKUP_PIPELINE_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
+        });
+
+        return $promise;
     }
 }

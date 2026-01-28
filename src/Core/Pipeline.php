@@ -27,7 +27,6 @@ namespace Fyennyi\AsyncCache\Core;
 
 use Fyennyi\AsyncCache\Middleware\MiddlewareInterface;
 use React\Promise\PromiseInterface;
-use function React\Promise\reject;
 
 /**
  * Orchestrates the recursive execution of the middleware stack
@@ -58,12 +57,16 @@ class Pipeline
                     try {
                         return $middleware->handle($context, $next);
                     } catch (\Throwable $e) {
-                        return reject($e);
+                        return \React\Promise\reject($e);
                     }
                 };
             },
             function (CacheContext $context) use ($destination) {
-                return $destination($context);
+                try {
+                    return $destination($context);
+                } catch (\Throwable $e) {
+                    return \React\Promise\reject($e);
+                }
             }
         );
 

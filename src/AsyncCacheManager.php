@@ -25,7 +25,6 @@
 
 namespace Fyennyi\AsyncCache;
 
-use Fyennyi\AsyncCache\Bridge\PromiseAdapter;
 use Fyennyi\AsyncCache\Core\CacheContext;
 use Fyennyi\AsyncCache\Core\Pipeline;
 use Fyennyi\AsyncCache\Middleware\AsyncLockMiddleware;
@@ -91,7 +90,7 @@ class AsyncCacheManager
         $this->lock_factory = $lock_factory ?? new LockFactory(new SemaphoreStore());
 
         $default_middlewares = [
-            new CoalesceMiddleware(),
+            new CoalesceMiddleware($this->logger),
             new StaleOnErrorMiddleware($this->logger, $this->dispatcher),
             new CacheLookupMiddleware($this->storage, $this->logger, $this->dispatcher),
             new TagValidationMiddleware($this->storage, $this->logger),
@@ -116,11 +115,8 @@ class AsyncCacheManager
 
         // Execute the pipeline.
         return $this->pipeline->send($context, function (CacheContext $ctx) {
-            try {
-                return PromiseAdapter::toPromise(($ctx->promise_factory)());
-            } catch (\Throwable $e) {
-                return \React\Promise\reject($e);
-            }
+            $result = ($ctx->promise_factory)();
+            return $result instanceof PromiseInterface ? $result : \React\Promise\resolve($result);
         });
     }
 
