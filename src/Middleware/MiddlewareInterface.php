@@ -42,5 +42,5 @@ interface MiddlewareInterface
      * @param  callable(CacheContext):PromiseInterface<T> $next    The next middleware or destination in the chain
      * @return PromiseInterface<T>                        A promise representing the eventual result of the operation
      */
-    public function handle(CacheContext $context, callable $next): PromiseInterface;
+    public function handle(CacheContext $context, callable $next) : PromiseInterface;
 }

@@ -36,7 +36,7 @@ class PhpSerializer implements SerializerInterface
      * @param  mixed  $data Data to be serialized using native PHP serialization
      * @return string Serialized PHP string package
      */
-    public function serialize(mixed $data): string
+    public function serialize(mixed $data) : string
     {
         return serialize($data);
     }
@@ -47,7 +47,7 @@ class PhpSerializer implements SerializerInterface
      * @param  string $data The string to be unserialized
      * @return mixed  The original data structure
      */
-    public function unserialize(string $data): mixed
+    public function unserialize(string $data) : mixed
     {
         return unserialize($data);
     }

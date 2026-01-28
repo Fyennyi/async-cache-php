@@ -59,7 +59,7 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
      *
      * @return PromiseInterface<mixed>
      */
-    public function get(string $key): PromiseInterface
+    public function get(string $key) : PromiseInterface
     {
         return $this->resolveLayer($key, 0);
     }
@@ -69,7 +69,7 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
      * @param  int                     $index Current adapter index
      * @return PromiseInterface<mixed>
      */
-    private function resolveLayer(string $key, int $index): PromiseInterface
+    private function resolveLayer(string $key, int $index) : PromiseInterface
     {
         if (! isset($this->adapters[$index])) {
             return \React\Promise\resolve(null);
@@ -101,7 +101,7 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
      *
      * @return PromiseInterface<iterable<string,  mixed>>
      */
-    public function getMultiple(iterable $keys): PromiseInterface
+    public function getMultiple(iterable $keys) : PromiseInterface
     {
         /** @var string[] $keys_array */
         $keys_array = is_array($keys) ? $keys : iterator_to_array($keys);
@@ -137,7 +137,7 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
      *
      * @return PromiseInterface<bool>
      */
-    public function set(string $key, mixed $value, ?int $ttl = null): PromiseInterface
+    public function set(string $key, mixed $value, ?int $ttl = null) : PromiseInterface
     {
         if (empty($this->adapters)) {
             return \React\Promise\resolve(true);
@@ -156,7 +156,7 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
      *
      * @return PromiseInterface<bool>
      */
-    public function delete(string $key): PromiseInterface
+    public function delete(string $key) : PromiseInterface
     {
         if (empty($this->adapters)) {
             return \React\Promise\resolve(true);
@@ -175,7 +175,7 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
      *
      * @return PromiseInterface<bool>
      */
-    public function clear(): PromiseInterface
+    public function clear() : PromiseInterface
     {
         if (empty($this->adapters)) {
             return \React\Promise\resolve(true);

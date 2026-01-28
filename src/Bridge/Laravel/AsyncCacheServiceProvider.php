@@ -37,7 +37,7 @@ class AsyncCacheServiceProvider extends ServiceProvider
     /**
      * Register services in the container.
      */
-    public function register(): void
+    public function register() : void
     {
         $this->mergeConfigFrom(__DIR__ . '/../../../config/async-cache.php', 'async-cache');
 
@@ -53,7 +53,7 @@ class AsyncCacheServiceProvider extends ServiceProvider
     /**
      * Bootstrap services.
      */
-    public function boot(): void
+    public function boot() : void
     {
         $this->publishes([
             __DIR__ . '/../../../config/async-cache.php' => \config_path('async-cache.php'),

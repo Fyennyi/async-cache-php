@@ -50,8 +50,7 @@ class CacheLookupMiddleware implements MiddlewareInterface
         private CacheStorage $storage,
         private LoggerInterface $logger,
         private ?EventDispatcherInterface $dispatcher = null
-    ) {
-    }
+    ) {}
 
     /**
      * Performs initial cache lookup and handles freshness validation.
@@ -61,7 +60,7 @@ class CacheLookupMiddleware implements MiddlewareInterface
      * @param  callable(CacheContext):PromiseInterface<T> $next
      * @return PromiseInterface<T>
      */
-    public function handle(CacheContext $context, callable $next): PromiseInterface
+    public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
         // Basic tracing for debugging
         $this->logger->debug('CacheLookupMiddleware: handling cache context', ['key' => $context->key, 'strategy' => $context->options->strategy->value]);

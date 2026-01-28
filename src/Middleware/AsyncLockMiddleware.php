@@ -58,8 +58,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
         private CacheStorage $storage,
         private LoggerInterface $logger,
         private ?EventDispatcherInterface $dispatcher = null
-    ) {
-    }
+    ) {}
 
     /**
      * Orchestrates non-blocking lock acquisition and cache population.
@@ -69,7 +68,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
      * @param  callable(CacheContext):PromiseInterface<T> $next
      * @return PromiseInterface<T>
      */
-    public function handle(CacheContext $context, callable $next): PromiseInterface
+    public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
         $lock_key = 'lock:' . $context->key;
         $lock = $this->lock_factory->createLock($lock_key, 30.0);
@@ -170,7 +169,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
      * @param  string                                     $lock_key Key of the acquired lock
      * @return PromiseInterface<T>                        Result promise
      */
-    private function handleWithLock(CacheContext $context, callable $next, string $lock_key): PromiseInterface
+    private function handleWithLock(CacheContext $context, callable $next, string $lock_key) : PromiseInterface
     {
         try {
             /** @var PromiseInterface<T> $promise */
@@ -191,7 +190,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
      *
      * @param string $lock_key Unique identifier of the lock to release
      */
-    private function releaseLock(string $lock_key): void
+    private function releaseLock(string $lock_key) : void
     {
         if (isset($this->active_locks[$lock_key])) {
             $this->logger->debug('AsyncCache LOCK_RELEASED', ['key' => $lock_key]);

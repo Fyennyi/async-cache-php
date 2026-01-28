@@ -53,8 +53,7 @@ class AsyncCacheBuilder
      */
     public function __construct(
         private PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter
-    ) {
-    }
+    ) {}
 
     /**
      * Entry point for the fluent builder.
@@ -62,7 +61,7 @@ class AsyncCacheBuilder
      * @param  PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter The underlying cache storage
      * @return self                                                             New builder instance
      */
-    public static function create(PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter): self
+    public static function create(PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter) : self
     {
         return new self($cache_adapter);
     }
@@ -73,7 +72,7 @@ class AsyncCacheBuilder
      * @param  LimiterInterface $rate_limiter The implementation to use
      * @return self             The current builder instance for chaining
      */
-    public function withRateLimiter(LimiterInterface $rate_limiter): self
+    public function withRateLimiter(LimiterInterface $rate_limiter) : self
     {
         $this->rate_limiter = $rate_limiter;
 
@@ -86,7 +85,7 @@ class AsyncCacheBuilder
      * @param  LoggerInterface $logger Logger implementation
      * @return self            The current builder instance for chaining
      */
-    public function withLogger(LoggerInterface $logger): self
+    public function withLogger(LoggerInterface $logger) : self
     {
         $this->logger = $logger;
 
@@ -99,7 +98,7 @@ class AsyncCacheBuilder
      * @param  LockFactory $lock_factory Lock factory instance
      * @return self        The current builder instance for chaining
      */
-    public function withLockFactory(LockFactory $lock_factory): self
+    public function withLockFactory(LockFactory $lock_factory) : self
     {
         $this->lock_factory = $lock_factory;
 
@@ -112,7 +111,7 @@ class AsyncCacheBuilder
      * @param  MiddlewareInterface $middleware Middleware implementation
      * @return self                The current builder instance for chaining
      */
-    public function withMiddleware(MiddlewareInterface $middleware): self
+    public function withMiddleware(MiddlewareInterface $middleware) : self
     {
         $this->middlewares[] = $middleware;
 
@@ -125,7 +124,7 @@ class AsyncCacheBuilder
      * @param  EventDispatcherInterface $dispatcher Dispatcher implementation
      * @return self                     The current builder instance for chaining
      */
-    public function withEventDispatcher(EventDispatcherInterface $dispatcher): self
+    public function withEventDispatcher(EventDispatcherInterface $dispatcher) : self
     {
         $this->dispatcher = $dispatcher;
 
@@ -138,7 +137,7 @@ class AsyncCacheBuilder
      * @param  SerializerInterface $serializer Serializer implementation
      * @return self                The current builder instance for chaining
      */
-    public function withSerializer(SerializerInterface $serializer): self
+    public function withSerializer(SerializerInterface $serializer) : self
     {
         $this->serializer = $serializer;
 
@@ -150,7 +149,7 @@ class AsyncCacheBuilder
      *
      * @return AsyncCacheManager A fully configured manager instance
      */
-    public function build(): AsyncCacheManager
+    public function build() : AsyncCacheManager
     {
         return new AsyncCacheManager(
             $this->cache_adapter,

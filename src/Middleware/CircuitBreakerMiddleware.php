@@ -69,7 +69,7 @@ class CircuitBreakerMiddleware implements MiddlewareInterface
      * @param  callable(CacheContext):PromiseInterface<T> $next Next handler in the chain
      * @return PromiseInterface<T>                        Result promise
      */
-    public function handle(CacheContext $context, callable $next): PromiseInterface
+    public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
         $lock_key = $this->prefix . 'lock:' . $context->key;
         $state_key = $this->prefix . 'state:' . $context->key;
@@ -125,7 +125,7 @@ class CircuitBreakerMiddleware implements MiddlewareInterface
     /**
      * Handles successful request completion.
      */
-    private function onSuccess(string $state_key, string $failure_key, string $last_fail_key, string $key): void
+    private function onSuccess(string $state_key, string $failure_key, string $last_fail_key, string $key) : void
     {
         $this->storage->set($state_key, self::STATE_CLOSED);
         $this->storage->set($failure_key, 0);
@@ -136,7 +136,7 @@ class CircuitBreakerMiddleware implements MiddlewareInterface
     /**
      * Handles request failure.
      */
-    private function onFailure(string $state_key, string $failure_key, string $last_fail_key, string $key): void
+    private function onFailure(string $state_key, string $failure_key, string $last_fail_key, string $key) : void
     {
         /** @var mixed $val */
         $val = $this->storage->get($failure_key, 0);

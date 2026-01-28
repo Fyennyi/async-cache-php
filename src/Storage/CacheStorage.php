@@ -61,7 +61,7 @@ class CacheStorage
      * @param  CacheOptions            $options Configuration options for fail-safe retrieval
      * @return PromiseInterface<mixed>
      */
-    public function get(string $key, CacheOptions $options): PromiseInterface
+    public function get(string $key, CacheOptions $options) : PromiseInterface
     {
         return $this->adapter->get($key)->then(
             function ($cached_item) use ($key) {
@@ -102,7 +102,7 @@ class CacheStorage
      * @param  float                  $generation_time Time taken to generate the data in seconds
      * @return PromiseInterface<bool>
      */
-    public function set(string $key, mixed $data, CacheOptions $options, float $generation_time = 0.0): PromiseInterface
+    public function set(string $key, mixed $data, CacheOptions $options, float $generation_time = 0.0) : PromiseInterface
     {
         $physical_ttl = $options->ttl + $options->stale_grace_period;
 
@@ -147,7 +147,7 @@ class CacheStorage
      * @param  string[]               $tags List of tag names to invalidate
      * @return PromiseInterface<bool> Resolving to true on successful invalidation of all tags
      */
-    public function invalidateTags(array $tags): PromiseInterface
+    public function invalidateTags(array $tags) : PromiseInterface
     {
         if (empty($tags)) {
             return \React\Promise\resolve(true);
@@ -172,7 +172,7 @@ class CacheStorage
      * @param  string          $key         The cache key for logging purposes
      * @return CachedItem|null The decompressed item object or null on error
      */
-    private function processDecompression(CachedItem $cached_item, string $key): ?CachedItem
+    private function processDecompression(CachedItem $cached_item, string $key) : ?CachedItem
     {
         if ($cached_item->is_compressed && is_string($cached_item->data)) {
             $decompressed_data = @gzuncompress($cached_item->data);
@@ -203,7 +203,7 @@ class CacheStorage
      * @param  bool                                    $create_missing Whether to generate and store new versions for missing tags
      * @return PromiseInterface<array<string, string>> Resolves to array of [tag => version]
      */
-    public function fetchTagVersions(array $tags, bool $create_missing = false): PromiseInterface
+    public function fetchTagVersions(array $tags, bool $create_missing = false) : PromiseInterface
     {
         if (empty($tags)) {
             return \React\Promise\resolve([]);
@@ -238,7 +238,7 @@ class CacheStorage
      *
      * @return string A unique identifier for the tag version
      */
-    private function generateVersion(): string
+    private function generateVersion() : string
     {
         return uniqid('', true);
     }
@@ -249,7 +249,7 @@ class CacheStorage
      * @param  string                 $key The unique cache key identifier of the item to delete
      * @return PromiseInterface<bool>
      */
-    public function delete(string $key): PromiseInterface
+    public function delete(string $key) : PromiseInterface
     {
         return $this->adapter->delete($key);
     }
@@ -259,7 +259,7 @@ class CacheStorage
      *
      * @return PromiseInterface<bool>
      */
-    public function clear(): PromiseInterface
+    public function clear() : PromiseInterface
     {
         return $this->adapter->clear();
     }
@@ -269,10 +269,8 @@ class CacheStorage
      *
      * @return AsyncCacheAdapterInterface The low-level adapter implementation
      */
-    public function getAdapter(): AsyncCacheAdapterInterface
+    public function getAdapter() : AsyncCacheAdapterInterface
     {
         return $this->adapter;
     }
-}/**
- * @return PromiseInterface<array<string, string>> Resolves to array of [tag => version]
- */
+}

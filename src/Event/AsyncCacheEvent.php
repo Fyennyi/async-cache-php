@@ -37,6 +37,5 @@ abstract class AsyncCacheEvent
     public function __construct(
         public readonly string $key,
         public readonly float $timestamp
-    ) {
-    }
+    ) {}
 }

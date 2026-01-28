@@ -38,7 +38,7 @@ interface AsyncCacheAdapterInterface
      * @param  string                  $key The unique identifier of the cached item
      * @return PromiseInterface<mixed> Promise resolving to the cached value or null if not found
      */
-    public function get(string $key): PromiseInterface;
+    public function get(string $key) : PromiseInterface;
 
     /**
      * Retrieves multiple items from the cache by their keys.
@@ -46,7 +46,7 @@ interface AsyncCacheAdapterInterface
      * @param  iterable<string>                          $keys A list of keys to retrieve
      * @return PromiseInterface<iterable<string, mixed>> Promise resolving to an associative array of key => value
      */
-    public function getMultiple(iterable $keys): PromiseInterface;
+    public function getMultiple(iterable $keys) : PromiseInterface;
 
     /**
      * Persists data in the cache associated with a specific key.
@@ -56,7 +56,7 @@ interface AsyncCacheAdapterInterface
      * @param  int|null               $ttl   Optional time-to-live in seconds
      * @return PromiseInterface<bool> Promise resolving to true on success
      */
-    public function set(string $key, mixed $value, ?int $ttl = null): PromiseInterface;
+    public function set(string $key, mixed $value, ?int $ttl = null) : PromiseInterface;
 
     /**
      * Removes an item from the cache.
@@ -64,12 +64,12 @@ interface AsyncCacheAdapterInterface
      * @param  string                 $key The unique identifier to remove
      * @return PromiseInterface<bool> Promise resolving to true on success
      */
-    public function delete(string $key): PromiseInterface;
+    public function delete(string $key) : PromiseInterface;
 
     /**
      * Wipes the entire cache storage.
      *
      * @return PromiseInterface<bool> Promise resolving to true on success
      */
-    public function clear(): PromiseInterface;
+    public function clear() : PromiseInterface;
 }

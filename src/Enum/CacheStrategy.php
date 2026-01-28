@@ -28,7 +28,7 @@ namespace Fyennyi\AsyncCache\Enum;
 /**
  * Strategy for handling cache misses and expiration.
  */
-enum CacheStrategy: string
+enum CacheStrategy : string
 {
     /**
      * Default behavior: wait for fresh data if expired.

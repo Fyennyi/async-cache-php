@@ -109,7 +109,7 @@ class AsyncCacheManager
      * @param  CacheOptions            $options         Caching configuration for this specific request
      * @return PromiseInterface<mixed> A promise representing the eventual result of the operation
      */
-    public function wrap(string $key, callable $promise_factory, CacheOptions $options): PromiseInterface
+    public function wrap(string $key, callable $promise_factory, CacheOptions $options) : PromiseInterface
     {
         $context = new CacheContext($key, $promise_factory, $options);
 
@@ -132,7 +132,7 @@ class AsyncCacheManager
      * @param  CacheOptions|null     $options Optional caching options for persistence
      * @return PromiseInterface<int> Promise resolving to the new integer value after increment
      */
-    public function increment(string $key, int $step = 1, ?CacheOptions $options = null): PromiseInterface
+    public function increment(string $key, int $step = 1, ?CacheOptions $options = null) : PromiseInterface
     {
         $options = $options ?? new CacheOptions();
         $lock_key = 'lock:counter:' . $key;
@@ -199,7 +199,7 @@ class AsyncCacheManager
      * @param  CacheOptions|null     $options Optional caching options for persistence
      * @return PromiseInterface<int> Promise resolving to the new integer value after decrement
      */
-    public function decrement(string $key, int $step = 1, ?CacheOptions $options = null): PromiseInterface
+    public function decrement(string $key, int $step = 1, ?CacheOptions $options = null) : PromiseInterface
     {
         return $this->increment($key, -$step, $options);
     }
@@ -210,7 +210,7 @@ class AsyncCacheManager
      * @param  string[]               $tags List of tag names to invalidate
      * @return PromiseInterface<bool> Resolves to true on successful invalidation
      */
-    public function invalidateTags(array $tags): PromiseInterface
+    public function invalidateTags(array $tags) : PromiseInterface
     {
         return $this->storage->invalidateTags($tags);
     }
@@ -220,7 +220,7 @@ class AsyncCacheManager
      *
      * @return PromiseInterface<bool> Resolves to true on successful wipe
      */
-    public function clear(): PromiseInterface
+    public function clear() : PromiseInterface
     {
         return $this->storage->clear();
     }
@@ -231,7 +231,7 @@ class AsyncCacheManager
      * @param  string                 $key Item identifier to remove
      * @return PromiseInterface<bool> Promise resolving to true on successful deletion
      */
-    public function delete(string $key): PromiseInterface
+    public function delete(string $key) : PromiseInterface
     {
         return $this->storage->delete($key);
     }
@@ -241,7 +241,7 @@ class AsyncCacheManager
      *
      * @return LimiterInterface|null The Symfony Rate Limiter or null if not set
      */
-    public function getRateLimiter(): ?LimiterInterface
+    public function getRateLimiter() : ?LimiterInterface
     {
         return $this->rate_limiter;
     }
@@ -249,7 +249,7 @@ class AsyncCacheManager
     /**
      * Resets the rate limiter state.
      */
-    public function clearRateLimiter(): void
+    public function clearRateLimiter() : void
     {
         $this->rate_limiter?->reset();
     }

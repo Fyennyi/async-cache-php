@@ -43,8 +43,7 @@ class TagValidationMiddleware implements MiddlewareInterface
     public function __construct(
         private CacheStorage $storage,
         private LoggerInterface $logger
-    ) {
-    }
+    ) {}
 
     /**
      * @template T
@@ -54,7 +53,7 @@ class TagValidationMiddleware implements MiddlewareInterface
      * @param  callable(CacheContext):PromiseInterface<T> $next    The next middleware in the chain
      * @return PromiseInterface<T>                        A promise representing the eventual result
      */
-    public function handle(CacheContext $context, callable $next): PromiseInterface
+    public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
         $item = $context->stale_item;
 

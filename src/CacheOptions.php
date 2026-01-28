@@ -55,6 +55,5 @@ class CacheOptions
         public float $x_fetch_beta = 1.0,
         public ?string $rate_limit_key = null,
         public array $tags = []
-    ) {
-    }
+    ) {}
 }

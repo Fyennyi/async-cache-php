@@ -36,16 +36,14 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
     /**
      * @param PsrCacheInterface $psr_cache The synchronous PSR-16 cache
      */
-    public function __construct(private PsrCacheInterface $psr_cache)
-    {
-    }
+    public function __construct(private PsrCacheInterface $psr_cache) {}
 
     /**
      * @inheritDoc
      *
      * @return PromiseInterface<mixed>
      */
-    public function get(string $key): PromiseInterface
+    public function get(string $key) : PromiseInterface
     {
         try {
             return \React\Promise\resolve($this->psr_cache->get($key));
@@ -59,7 +57,7 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
      *
      * @return PromiseInterface<iterable<string,  mixed>>
      */
-    public function getMultiple(iterable $keys): PromiseInterface
+    public function getMultiple(iterable $keys) : PromiseInterface
     {
         try {
             return \React\Promise\resolve($this->psr_cache->getMultiple($keys));
@@ -73,7 +71,7 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
      *
      * @return PromiseInterface<bool>
      */
-    public function set(string $key, mixed $value, ?int $ttl = null): PromiseInterface
+    public function set(string $key, mixed $value, ?int $ttl = null) : PromiseInterface
     {
         try {
             return \React\Promise\resolve($this->psr_cache->set($key, $value, $ttl));
@@ -87,7 +85,7 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
      *
      * @return PromiseInterface<bool>
      */
-    public function delete(string $key): PromiseInterface
+    public function delete(string $key) : PromiseInterface
     {
         try {
             return \React\Promise\resolve($this->psr_cache->delete($key));
@@ -101,7 +99,7 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
      *
      * @return PromiseInterface<bool>
      */
-    public function clear(): PromiseInterface
+    public function clear() : PromiseInterface
     {
         try {
             return \React\Promise\resolve($this->psr_cache->clear());

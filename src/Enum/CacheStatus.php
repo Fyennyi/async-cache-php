@@ -28,7 +28,7 @@ namespace Fyennyi\AsyncCache\Enum;
 /**
  * Internal cache operation status.
  */
-enum CacheStatus: string
+enum CacheStatus : string
 {
     case Hit = 'hit';
     case Miss = 'miss';

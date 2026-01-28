@@ -62,7 +62,7 @@ class RetryMiddleware implements MiddlewareInterface
      * @param  callable(CacheContext):PromiseInterface<T> $next    Next handler in the chain
      * @return PromiseInterface<T>                        Promise result
      */
-    public function handle(CacheContext $context, callable $next): PromiseInterface
+    public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
         return $this->attempt($context, $next, 0);
     }
@@ -77,7 +77,7 @@ class RetryMiddleware implements MiddlewareInterface
      * @param  int                                        $retries Current retry attempt counter
      * @return PromiseInterface<T>                        Result of the attempt
      */
-    private function attempt(CacheContext $context, callable $next, int $retries): PromiseInterface
+    private function attempt(CacheContext $context, callable $next, int $retries) : PromiseInterface
     {
         /** @var PromiseInterface<T> $promise */
         $promise = $next($context);

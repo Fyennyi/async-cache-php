@@ -53,7 +53,7 @@ class CoalesceMiddleware implements MiddlewareInterface
      * @param  callable(CacheContext):PromiseInterface<T> $next
      * @return PromiseInterface<T>
      */
-    public function handle(CacheContext $context, callable $next): PromiseInterface
+    public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
         if (isset($this->pending[$context->key])) {
             /** @var PromiseInterface<T> $pending_promise */

@@ -59,7 +59,7 @@ class StaleOnErrorMiddleware implements MiddlewareInterface
      * @param  callable(CacheContext):PromiseInterface<T> $next Next handler in the chain
      * @return PromiseInterface<T>                        Promise resolving to fresh or stale data
      */
-    public function handle(CacheContext $context, callable $next): PromiseInterface
+    public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
         /** @var PromiseInterface<T> $promise */
         $promise = $next($context);

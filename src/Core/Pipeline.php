@@ -38,8 +38,7 @@ class Pipeline
      */
     public function __construct(
         private array $middlewares = []
-    ) {
-    }
+    ) {}
 
     /**
      * Sends the context through the pipeline towards the final destination.
@@ -50,7 +49,7 @@ class Pipeline
      * @param  callable(CacheContext):PromiseInterface<T> $destination The final handler (usually the fetcher)
      * @return PromiseInterface<T>                        Combined promise representing the full pipeline resolution
      */
-    public function send(CacheContext $context, callable $destination): PromiseInterface
+    public function send(CacheContext $context, callable $destination) : PromiseInterface
     {
         /** @var \Closure(CacheContext):PromiseInterface<T> $pipeline */
         $pipeline = array_reduce(

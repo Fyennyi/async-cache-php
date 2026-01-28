@@ -53,7 +53,7 @@ class EncryptingSerializer implements SerializerInterface
      * @throws \RuntimeException If encryption fails
      * @return string            Base64-encoded encrypted package (IV + TAG + Ciphertext)
      */
-    public function serialize(mixed $data): string
+    public function serialize(mixed $data) : string
     {
         $plaintext = $this->serializer->serialize($data);
         $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length(self::CIPHER));
@@ -82,7 +82,7 @@ class EncryptingSerializer implements SerializerInterface
      * @throws \RuntimeException If decryption fails or data is corrupted
      * @return mixed             Original reconstructed data
      */
-    public function unserialize(string $data): mixed
+    public function unserialize(string $data) : mixed
     {
         $decoded = base64_decode($data, true);
         if (false === $decoded) {

@@ -36,16 +36,14 @@ class ReactCacheAdapter implements AsyncCacheAdapterInterface
     /**
      * @param ReactCacheInterface $react_cache The ReactPHP cache implementation
      */
-    public function __construct(private ReactCacheInterface $react_cache)
-    {
-    }
+    public function __construct(private ReactCacheInterface $react_cache) {}
 
     /**
      * @inheritDoc
      *
      * @return PromiseInterface<mixed>
      */
-    public function get(string $key): PromiseInterface
+    public function get(string $key) : PromiseInterface
     {
         return $this->react_cache->get($key);
     }
@@ -55,7 +53,7 @@ class ReactCacheAdapter implements AsyncCacheAdapterInterface
      *
      * @return PromiseInterface<iterable<string,  mixed>>
      */
-    public function getMultiple(iterable $keys): PromiseInterface
+    public function getMultiple(iterable $keys) : PromiseInterface
     {
         /** @var string[] $keys_array */
         $keys_array = is_array($keys) ? $keys : iterator_to_array($keys);
@@ -70,7 +68,7 @@ class ReactCacheAdapter implements AsyncCacheAdapterInterface
      *
      * @return PromiseInterface<bool>
      */
-    public function set(string $key, mixed $value, ?int $ttl = null): PromiseInterface
+    public function set(string $key, mixed $value, ?int $ttl = null) : PromiseInterface
     {
         return $this->react_cache->set($key, $value, $ttl);
     }
@@ -80,7 +78,7 @@ class ReactCacheAdapter implements AsyncCacheAdapterInterface
      *
      * @return PromiseInterface<bool>
      */
-    public function delete(string $key): PromiseInterface
+    public function delete(string $key) : PromiseInterface
     {
         return $this->react_cache->delete($key);
     }
@@ -90,7 +88,7 @@ class ReactCacheAdapter implements AsyncCacheAdapterInterface
      *
      * @return PromiseInterface<bool>
      */
-    public function clear(): PromiseInterface
+    public function clear() : PromiseInterface
     {
         return $this->react_cache->clear();
     }

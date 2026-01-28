@@ -47,15 +47,14 @@ class CachedItem
         public readonly bool $is_compressed = false,
         public readonly float $generation_time = 0.0,
         public readonly array $tag_versions = []
-    ) {
-    }
+    ) {}
 
     /**
      * Checks if the item is still within its logical TTL.
      *
      * @return bool True if fresh, false if stale
      */
-    public function isFresh(): bool
+    public function isFresh() : bool
     {
         return time() < $this->logical_expire_time;
     }

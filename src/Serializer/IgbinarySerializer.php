@@ -46,7 +46,7 @@ class IgbinarySerializer implements SerializerInterface
      * @param  mixed  $data Data to be serialized using the igbinary binary format
      * @return string Serialized binary data string
      */
-    public function serialize(mixed $data): string
+    public function serialize(mixed $data) : string
     {
         if (! function_exists('\igbinary_serialize')) {
             throw new \RuntimeException('igbinary extension is not loaded');
@@ -60,7 +60,7 @@ class IgbinarySerializer implements SerializerInterface
      * @param  string $data The binary-encoded string to be unserialized
      * @return mixed  The original data structure
      */
-    public function unserialize(string $data): mixed
+    public function unserialize(string $data) : mixed
     {
         if (! function_exists('\igbinary_unserialize')) {
             throw new \RuntimeException('igbinary extension is not loaded');
