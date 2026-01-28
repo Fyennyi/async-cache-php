@@ -12,6 +12,12 @@ return (new Config())
     ->setFinder($finder)
     ->setRules([
         '@PSR12' => true,
+        'return_type_declaration' => ['space_before' => 'one'],
+        'method_argument_space' => [
+            'on_multiline' => 'ensure_fully_multiline',
+            'keep_multiple_spaces_after_comma' => false,
+        ],
+        'single_line_empty_body' => true,
         'no_whitespace_in_blank_line' => true,
         'no_trailing_whitespace' => true,
         'single_blank_line_at_eof' => true,
