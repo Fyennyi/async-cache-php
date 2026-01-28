@@ -6,8 +6,8 @@
  *    / \   ___ _   _ _ __   ___ / ___|__ _  ___| |__   ___  |  _ \| | | |  _ \
  *   / _ \ / __| | | | '_ \ / __| |   / _` |/ __| '_ \ / _ \ | |_) | |_| | |_) |
  *  / ___ \\__ \ |_| | | | | (__| |__| (_| | (__| | | |  __/ |  __/|  _  |  __/
- * /_/   \_\___/\__, |_| |_|\___|\____\__,_|\___|_| |_|\___| |_|   |_| |_|_| 
- *              |___/ 
+ * /_/   \_\___/\__, |_| |_|\___|\____\__,_|\___|_| |_|\___| |_|   |_| |_|_|
+ *              |___/
  *
  * This program is free software: you can redistribute and/or modify
  * it under the terms of the CSSM Unlimited License v2.0.
@@ -36,7 +36,7 @@ use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\RateLimiter\LimiterInterface;
 
 /**
- * Fluent builder for AsyncCacheManager focused on asynchronous operations
+ * Fluent builder for AsyncCacheManager focused on asynchronous operations.
  */
 class AsyncCacheBuilder
 {
@@ -49,7 +49,7 @@ class AsyncCacheBuilder
     private ?SerializerInterface $serializer = null;
 
     /**
-     * @param  PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface  $cache_adapter  The cache implementation
+     * @param PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter The cache implementation
      */
     public function __construct(
         private PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter
@@ -57,94 +57,100 @@ class AsyncCacheBuilder
     }
 
     /**
-     * Entry point for the fluent builder
+     * Entry point for the fluent builder.
      *
-     * @param  PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface  $cache_adapter  The underlying cache storage
-     * @return self                                                                              New builder instance
+     * @param  PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter The underlying cache storage
+     * @return self                                                             New builder instance
      */
-    public static function create(PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter) : self
+    public static function create(PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter): self
     {
         return new self($cache_adapter);
     }
 
     /**
-     * Sets a custom Symfony Rate Limiter implementation
+     * Sets a custom Symfony Rate Limiter implementation.
      *
-     * @param  LimiterInterface  $rate_limiter  The implementation to use
-     * @return self                             The current builder instance for chaining
+     * @param  LimiterInterface $rate_limiter The implementation to use
+     * @return self             The current builder instance for chaining
      */
-    public function withRateLimiter(LimiterInterface $rate_limiter) : self
+    public function withRateLimiter(LimiterInterface $rate_limiter): self
     {
         $this->rate_limiter = $rate_limiter;
+
         return $this;
     }
 
     /**
-     * Sets the PSR-3 logger
+     * Sets the PSR-3 logger.
      *
-     * @param  LoggerInterface  $logger  Logger implementation
-     * @return self                      The current builder instance for chaining
+     * @param  LoggerInterface $logger Logger implementation
+     * @return self            The current builder instance for chaining
      */
-    public function withLogger(LoggerInterface $logger) : self
+    public function withLogger(LoggerInterface $logger): self
     {
         $this->logger = $logger;
+
         return $this;
     }
 
     /**
-     * Configures the Symfony Lock Factory
+     * Configures the Symfony Lock Factory.
      *
-     * @param  LockFactory  $lock_factory  Lock factory instance
-     * @return self                        The current builder instance for chaining
+     * @param  LockFactory $lock_factory Lock factory instance
+     * @return self        The current builder instance for chaining
      */
-    public function withLockFactory(LockFactory $lock_factory) : self
+    public function withLockFactory(LockFactory $lock_factory): self
     {
         $this->lock_factory = $lock_factory;
+
         return $this;
     }
 
     /**
-     * Appends a custom middleware to the pipeline
+     * Appends a custom middleware to the pipeline.
      *
-     * @param  MiddlewareInterface  $middleware  Middleware implementation
-     * @return self                              The current builder instance for chaining
+     * @param  MiddlewareInterface $middleware Middleware implementation
+     * @return self                The current builder instance for chaining
      */
-    public function withMiddleware(MiddlewareInterface $middleware) : self
+    public function withMiddleware(MiddlewareInterface $middleware): self
     {
         $this->middlewares[] = $middleware;
+
         return $this;
     }
 
     /**
-     * Sets the PSR-14 event dispatcher
+     * Sets the PSR-14 event dispatcher.
      *
-     * @param  EventDispatcherInterface  $dispatcher  Dispatcher implementation
-     * @return self                                   The current builder instance for chaining
+     * @param  EventDispatcherInterface $dispatcher Dispatcher implementation
+     * @return self                     The current builder instance for chaining
      */
-    public function withEventDispatcher(EventDispatcherInterface $dispatcher) : self
+    public function withEventDispatcher(EventDispatcherInterface $dispatcher): self
     {
         $this->dispatcher = $dispatcher;
+
         return $this;
     }
 
     /**
-     * Sets a custom serializer for data storage
+     * Sets a custom serializer for data storage.
      *
-     * @param  SerializerInterface  $serializer  Serializer implementation
-     * @return self                              The current builder instance for chaining
+     * @param  SerializerInterface $serializer Serializer implementation
+     * @return self                The current builder instance for chaining
      */
-    public function withSerializer(SerializerInterface $serializer) : self
+    public function withSerializer(SerializerInterface $serializer): self
     {
         $this->serializer = $serializer;
+
         return $this;
     }
 
     /**
-     * Finalizes the configuration and creates the AsyncCacheManager
+     * Finalizes the configuration and creates the AsyncCacheManager.
      *
      * @return AsyncCacheManager A fully configured manager instance
      */
-    public function build() : AsyncCacheManager
+    public function build(): AsyncCacheManager
     {
         return new AsyncCacheManager(
             $this->cache_adapter,

@@ -26,7 +26,7 @@
 namespace Fyennyi\AsyncCache\Serializer;
 
 /**
- * High-performance serializer using the igbinary PHP extension
+ * High-performance serializer using the igbinary PHP extension.
  */
 class IgbinarySerializer implements SerializerInterface
 {
@@ -43,22 +43,28 @@ class IgbinarySerializer implements SerializerInterface
     /**
      * @inheritDoc
      *
-     * @param  mixed  $data  Data to be serialized using the igbinary binary format
-     * @return string        Serialized binary data string
+     * @param  mixed  $data Data to be serialized using the igbinary binary format
+     * @return string Serialized binary data string
      */
-    public function serialize(mixed $data) : string
+    public function serialize(mixed $data): string
     {
-        return igbinary_serialize($data) ?: '';
+        if (! function_exists('\igbinary_serialize')) {
+            throw new \RuntimeException('igbinary extension is not loaded');
+        }
+        return \igbinary_serialize($data) ?: '';
     }
 
     /**
      * @inheritDoc
      *
-     * @param  string  $data  The binary-encoded string to be unserialized
-     * @return mixed          The original data structure
+     * @param  string $data The binary-encoded string to be unserialized
+     * @return mixed  The original data structure
      */
-    public function unserialize(string $data) : mixed
+    public function unserialize(string $data): mixed
     {
-        return igbinary_unserialize($data);
+        if (! function_exists('\igbinary_unserialize')) {
+            throw new \RuntimeException('igbinary extension is not loaded');
+        }
+        return \igbinary_unserialize($data);
     }
 }

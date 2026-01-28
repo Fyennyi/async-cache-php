@@ -26,19 +26,19 @@
 namespace Fyennyi\AsyncCache\Model;
 
 /**
- * Value object representing a cached item with its metadata
+ * Value object representing a cached item with its metadata.
  */
 class CachedItem
 {
     public const CURRENT_VERSION = 1;
 
     /**
-     * @param  mixed     $data                 The actual cached value
-     * @param  int       $logical_expire_time  Unix timestamp when the data becomes stale
-     * @param  int       $version              Metadata schema version
-     * @param  bool      $is_compressed        Whether the data is currently gzipped
-     * @param  float     $generation_time      Duration in seconds taken to fetch this data
-     * @param  string[]  $tag_versions         Map of tag names to their versions at caching time
+     * @param mixed                  $data                The actual cached value
+     * @param int                    $logical_expire_time Unix timestamp when the data becomes stale
+     * @param int                    $version             Metadata schema version
+     * @param bool                   $is_compressed       Whether the data is currently gzipped
+     * @param float                  $generation_time     Duration in seconds taken to fetch this data
+     * @param array<string,  string> $tag_versions        Map of tag names to their versions at caching time
      */
     public function __construct(
         public readonly mixed $data,
@@ -51,11 +51,11 @@ class CachedItem
     }
 
     /**
-     * Checks if the item is still within its logical TTL
+     * Checks if the item is still within its logical TTL.
      *
      * @return bool True if fresh, false if stale
      */
-    public function isFresh() : bool
+    public function isFresh(): bool
     {
         return time() < $this->logical_expire_time;
     }

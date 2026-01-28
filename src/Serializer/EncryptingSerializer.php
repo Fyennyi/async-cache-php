@@ -26,36 +26,34 @@
 namespace Fyennyi\AsyncCache\Serializer;
 
 /**
- * Security decorator that encrypts data after serialization and decrypts before unserialization
+ * Security decorator that encrypts data after serialization and decrypts before unserialization.
  */
 class EncryptingSerializer implements SerializerInterface
 {
     private const CIPHER = 'aes-256-gcm';
 
     /**
-     * @param  SerializerInterface  $serializer  The inner serializer to wrap
-     * @param  string               $key         Secret encryption key (exactly 32 bytes for AES-256)
-     *
+     * @param  SerializerInterface       $serializer The inner serializer to wrap
+     * @param  string                    $key        Secret encryption key (exactly 32 bytes for AES-256)
      * @throws \InvalidArgumentException If the key length is incorrect
      */
     public function __construct(
         private SerializerInterface $serializer,
         private string $key
     ) {
-        if (strlen($this->key) !== 32) {
+        if (32 !== strlen($this->key)) {
             throw new \InvalidArgumentException("Encryption key must be exactly 32 bytes for AES-256");
         }
     }
 
     /**
-     * Serializes and encrypts data
+     * Serializes and encrypts data.
      *
-     * @param  mixed  $data  Data to process
-     * @return string        Base64-encoded encrypted package (IV + TAG + Ciphertext)
-     *
+     * @param  mixed             $data Data to process
      * @throws \RuntimeException If encryption fails
+     * @return string            Base64-encoded encrypted package (IV + TAG + Ciphertext)
      */
-    public function serialize(mixed $data) : string
+    public function serialize(mixed $data): string
     {
         $plaintext = $this->serializer->serialize($data);
         $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length(self::CIPHER));
@@ -69,7 +67,7 @@ class EncryptingSerializer implements SerializerInterface
             $tag
         );
 
-        if ($ciphertext === false) {
+        if (false === $ciphertext) {
             throw new \RuntimeException("Encryption failed: " . openssl_error_string());
         }
 
@@ -78,17 +76,16 @@ class EncryptingSerializer implements SerializerInterface
     }
 
     /**
-     * Decrypts and unserializes data
+     * Decrypts and unserializes data.
      *
-     * @param  string  $data  Base64-encoded encrypted package
-     * @return mixed          Original reconstructed data
-     *
+     * @param  string            $data Base64-encoded encrypted package
      * @throws \RuntimeException If decryption fails or data is corrupted
+     * @return mixed             Original reconstructed data
      */
-    public function unserialize(string $data) : mixed
+    public function unserialize(string $data): mixed
     {
         $decoded = base64_decode($data, true);
-        if ($decoded === false) {
+        if (false === $decoded) {
             throw new \RuntimeException("Failed to decode base64 data");
         }
 
@@ -108,7 +105,7 @@ class EncryptingSerializer implements SerializerInterface
             $tag
         );
 
-        if ($plaintext === false) {
+        if (false === $plaintext) {
             throw new \RuntimeException("Decryption failed. Data might be corrupted or key is invalid.");
         }
 

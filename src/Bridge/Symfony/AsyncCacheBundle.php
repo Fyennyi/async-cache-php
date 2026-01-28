@@ -28,14 +28,14 @@ namespace Fyennyi\AsyncCache\Bridge\Symfony;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 
 /**
- * Symfony Bundle for AsyncCache integration
+ * Symfony Bundle for AsyncCache integration.
  */
 class AsyncCacheBundle extends Bundle
 {
     /**
      * @return \Symfony\Component\DependencyInjection\Extension\ExtensionInterface|null The bundle extension
      */
-    public function getContainerExtension() : ?\Symfony\Component\DependencyInjection\Extension\ExtensionInterface
+    public function getContainerExtension(): ?\Symfony\Component\DependencyInjection\Extension\ExtensionInterface
     {
         return new DependencyInjection\AsyncCacheExtension();
     }

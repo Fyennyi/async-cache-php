@@ -28,48 +28,48 @@ namespace Fyennyi\AsyncCache\Storage;
 use React\Promise\PromiseInterface;
 
 /**
- * Common interface for all asynchronous cache storage backends
+ * Common interface for all asynchronous cache storage backends.
  */
 interface AsyncCacheAdapterInterface
 {
     /**
-     * Retrieves an item by its key
+     * Retrieves an item from the cache by its unique key.
      *
-     * @param  string  $key  The unique identifier of the item
-     * @return PromiseInterface Resolving to the raw value or null if not found
+     * @param  string                  $key The unique identifier of the cached item
+     * @return PromiseInterface<mixed> Promise resolving to the cached value or null if not found
      */
-    public function get(string $key) : PromiseInterface;
+    public function get(string $key): PromiseInterface;
 
     /**
-     * Retrieves multiple items by their keys
+     * Retrieves multiple items from the cache by their keys.
      *
-     * @param  iterable<string>  $keys  A list of keys to retrieve
-     * @return PromiseInterface         Resolving to an associative array of key => value pairs
+     * @param  iterable<string>                          $keys A list of keys to retrieve
+     * @return PromiseInterface<iterable<string, mixed>> Promise resolving to an associative array of key => value
      */
-    public function getMultiple(iterable $keys) : PromiseInterface;
+    public function getMultiple(iterable $keys): PromiseInterface;
 
     /**
-     * Persists an item in the cache
+     * Persists data in the cache associated with a specific key.
      *
-     * @param  string    $key    The unique identifier of the item
-     * @param  mixed     $value  The value to store (must be serializable)
-     * @param  int|null  $ttl    Optional time to live in seconds
-     * @return PromiseInterface Resolving to true on success, false otherwise
+     * @param  string                 $key   The unique identifier for the item
+     * @param  mixed                  $value The data to store
+     * @param  int|null               $ttl   Optional time-to-live in seconds
+     * @return PromiseInterface<bool> Promise resolving to true on success
      */
-    public function set(string $key, mixed $value, ?int $ttl = null) : PromiseInterface;
+    public function set(string $key, mixed $value, ?int $ttl = null): PromiseInterface;
 
     /**
-     * Removes an item by its key
+     * Removes an item from the cache.
      *
-     * @param  string  $key  The unique identifier of the item to remove
-     * @return PromiseInterface Resolving to true on success, false otherwise
+     * @param  string                 $key The unique identifier to remove
+     * @return PromiseInterface<bool> Promise resolving to true on success
      */
-    public function delete(string $key) : PromiseInterface;
+    public function delete(string $key): PromiseInterface;
 
     /**
-     * Wipes all entries from the cache
+     * Wipes the entire cache storage.
      *
-     * @return PromiseInterface Resolving to true on success, false otherwise
+     * @return PromiseInterface<bool> Promise resolving to true on success
      */
-    public function clear() : PromiseInterface;
+    public function clear(): PromiseInterface;
 }

@@ -26,17 +26,17 @@
 namespace Fyennyi\AsyncCache\Serializer;
 
 /**
- * Standard PHP serialization implementation
+ * Standard PHP serialization implementation.
  */
 class PhpSerializer implements SerializerInterface
 {
     /**
      * @inheritDoc
      *
-     * @param  mixed  $data  Data to be serialized using native PHP serialization
-     * @return string        Serialized PHP string package
+     * @param  mixed  $data Data to be serialized using native PHP serialization
+     * @return string Serialized PHP string package
      */
-    public function serialize(mixed $data) : string
+    public function serialize(mixed $data): string
     {
         return serialize($data);
     }
@@ -44,10 +44,10 @@ class PhpSerializer implements SerializerInterface
     /**
      * @inheritDoc
      *
-     * @param  string  $data  The string to be unserialized
-     * @return mixed          The original data structure
+     * @param  string $data The string to be unserialized
+     * @return mixed  The original data structure
      */
-    public function unserialize(string $data) : mixed
+    public function unserialize(string $data): mixed
     {
         return unserialize($data);
     }

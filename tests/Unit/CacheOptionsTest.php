@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 
 class CacheOptionsTest extends TestCase
 {
-    public function testDefaults() : void
+    public function testDefaults(): void
     {
         $options = new CacheOptions();
 
@@ -20,7 +20,7 @@ class CacheOptionsTest extends TestCase
         $this->assertSame([], $options->tags);
     }
 
-    public function testCustomValues() : void
+    public function testCustomValues(): void
     {
         $options = new CacheOptions(
             ttl: 300,

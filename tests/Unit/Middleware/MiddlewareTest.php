@@ -2,25 +2,23 @@
 
 namespace Tests\Unit\Middleware;
 
+use Fyennyi\AsyncCache\CacheOptions;
 use Fyennyi\AsyncCache\Core\CacheContext;
 use Fyennyi\AsyncCache\Core\Deferred;
-use Fyennyi\AsyncCache\CacheOptions;
-use Fyennyi\AsyncCache\Middleware\RetryMiddleware;
 use Fyennyi\AsyncCache\Middleware\CoalesceMiddleware;
-use Fyennyi\AsyncCache\Middleware\StaleOnErrorMiddleware;
-use PHPUnit\Framework\MockObject\MockObject;
+use Fyennyi\AsyncCache\Middleware\RetryMiddleware;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 class MiddlewareTest extends TestCase
 {
-    public function testRetryMiddlewareRetries() : void
+    public function testRetryMiddlewareRetries(): void
     {
         $middleware = new RetryMiddleware(max_retries: 2, initial_delay_ms: 1, logger: new NullLogger());
-        $context = new CacheContext('k', fn()=>null, new CacheOptions());
-        
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
+
         $failCount = 0;
-        $next = function() use (&$failCount) {
+        $next = function () use (&$failCount) {
             $d = new Deferred();
             if ($failCount < 2) {
                 $failCount++;
@@ -36,14 +34,14 @@ class MiddlewareTest extends TestCase
         $this->assertSame(2, $failCount);
     }
 
-    public function testCoalesceMiddleware() : void
+    public function testCoalesceMiddleware(): void
     {
         $middleware = new CoalesceMiddleware();
-        $context = new CacheContext('k', fn()=>null, new CacheOptions());
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
 
         $deferred = new Deferred();
         $callCount = 0;
-        $next = function() use ($deferred, &$callCount) {
+        $next = function () use ($deferred, &$callCount) {
             $callCount++;
             return $deferred->future();
         };

@@ -14,30 +14,33 @@ class ChainCacheAdapterTest extends TestCase
     private MockObject|AsyncCacheAdapterInterface $l2;
     private ChainCacheAdapter $adapter;
 
-    protected function setUp() : void
+    protected function setUp(): void
     {
         $this->l1 = $this->createMock(AsyncCacheAdapterInterface::class);
         $this->l2 = $this->createMock(AsyncCacheAdapterInterface::class);
         $this->adapter = new ChainCacheAdapter([$this->l1, $this->l2]);
     }
 
-    public function testGetReturnsFromFirstLayer() : void
+    public function testGetReturnsFromFirstLayer(): void
     {
-        $d = new Deferred(); $d->resolve('val1');
+        $d = new Deferred();
+        $d->resolve('val1');
         $this->l1->method('get')->with('key')->willReturn($d->future());
         $this->l2->expects($this->never())->method('get');
 
         $this->assertSame('val1', $this->adapter->get('key')->wait());
     }
 
-    public function testGetFallsBackAndBackfills() : void
+    public function testGetFallsBackAndBackfills(): void
     {
         // L1 miss
-        $d1 = new Deferred(); $d1->resolve(null);
+        $d1 = new Deferred();
+        $d1->resolve(null);
         $this->l1->method('get')->with('key')->willReturn($d1->future());
 
         // L2 hit
-        $d2 = new Deferred(); $d2->resolve('val2');
+        $d2 = new Deferred();
+        $d2->resolve('val2');
         $this->l2->method('get')->with('key')->willReturn($d2->future());
 
         // Expect L1 to be backfilled
@@ -46,23 +49,27 @@ class ChainCacheAdapterTest extends TestCase
         $this->assertSame('val2', $this->adapter->get('key')->wait());
     }
 
-    public function testSetWritesToAllLayers() : void
+    public function testSetWritesToAllLayers(): void
     {
-        $d1 = new Deferred(); $d1->resolve(true);
+        $d1 = new Deferred();
+        $d1->resolve(true);
         $this->l1->expects($this->once())->method('set')->with('k', 'v', 10)->willReturn($d1->future());
 
-        $d2 = new Deferred(); $d2->resolve(true);
+        $d2 = new Deferred();
+        $d2->resolve(true);
         $this->l2->expects($this->once())->method('set')->with('k', 'v', 10)->willReturn($d2->future());
 
         $this->assertTrue($this->adapter->set('k', 'v', 10)->wait());
     }
 
-    public function testDeleteDeletesFromAllLayers() : void
+    public function testDeleteDeletesFromAllLayers(): void
     {
-        $d1 = new Deferred(); $d1->resolve(true);
+        $d1 = new Deferred();
+        $d1->resolve(true);
         $this->l1->expects($this->once())->method('delete')->with('k')->willReturn($d1->future());
 
-        $d2 = new Deferred(); $d2->resolve(true);
+        $d2 = new Deferred();
+        $d2->resolve(true);
         $this->l2->expects($this->once())->method('delete')->with('k')->willReturn($d2->future());
 
         $this->assertTrue($this->adapter->delete('k')->wait());

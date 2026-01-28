@@ -20,7 +20,7 @@ class AsyncLockMiddlewareTest extends TestCase
     private LockFactory $lockFactory;
     private AsyncLockMiddleware $middleware;
 
-    protected function setUp() : void
+    protected function setUp(): void
     {
         $this->storage = $this->createMock(CacheStorage::class);
         $this->lockFactory = new LockFactory(new InMemoryStore());
@@ -31,29 +31,31 @@ class AsyncLockMiddlewareTest extends TestCase
         );
     }
 
-    public function testAcquiresLockAndProceeds() : void
+    public function testAcquiresLockAndProceeds(): void
     {
-        $context = new CacheContext('k', fn()=>null, new CacheOptions());
-        
-        $next = function() {
-            $d = new Deferred(); $d->resolve('ok'); return $d->future();
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
+
+        $next = function () {
+            $d = new Deferred();
+            $d->resolve('ok');
+            return $d->future();
         };
 
         $this->assertSame('ok', $this->middleware->handle($context, $next)->wait());
     }
 
-    public function testReturnsStaleIfLockedAndStaleAvailable() : void
+    public function testReturnsStaleIfLockedAndStaleAvailable(): void
     {
         // Acquire lock manually first to simulate busy
         $lock = $this->lockFactory->createLock('lock:k');
         $lock->acquire();
 
         $item = new CachedItem('stale', time() - 10);
-        $context = new CacheContext('k', fn()=>null, new CacheOptions());
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
         $context->stale_item = $item;
 
         // Next should not be called
-        $next = fn() => (new Deferred())->future(); // dummy
+        $next = fn () => (new Deferred())->future(); // dummy
 
         $this->assertSame('stale', $this->middleware->handle($context, $next)->wait());
     }

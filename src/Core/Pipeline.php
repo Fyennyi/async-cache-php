@@ -29,32 +29,36 @@ use Fyennyi\AsyncCache\Middleware\MiddlewareInterface;
 use React\Promise\PromiseInterface;
 
 /**
- * Orchestrates the recursive execution of the middleware stack
+ * Orchestrates the recursive execution of the middleware stack.
  */
 class Pipeline
 {
     /**
-     * @param  MiddlewareInterface[]  $middlewares  Stack of handlers to execute
+     * @param MiddlewareInterface[] $middlewares Stack of handlers to execute
      */
     public function __construct(
         private array $middlewares = []
     ) {
     }
 
-     /**
-      * Sends the context through the pipeline towards the final destination
-      *
-      * @param  CacheContext                             $context      The current state object
-      * @param  callable(CacheContext):PromiseInterface  $destination  The final handler (usually the fetcher)
-      * @return PromiseInterface                                       Combined promise representing the full pipeline resolution
-      */
-    public function send(CacheContext $context, callable $destination) : PromiseInterface
+    /**
+     * Sends the context through the pipeline towards the final destination.
+     *
+     * @template T
+     *
+     * @param  CacheContext                               $context     The current state object
+     * @param  callable(CacheContext):PromiseInterface<T> $destination The final handler (usually the fetcher)
+     * @return PromiseInterface<T>                        Combined promise representing the full pipeline resolution
+     */
+    public function send(CacheContext $context, callable $destination): PromiseInterface
     {
+        /** @var \Closure(CacheContext):PromiseInterface<T> $pipeline */
         $pipeline = array_reduce(
             array_reverse($this->middlewares),
             function ($next, MiddlewareInterface $middleware) {
                 return function (CacheContext $context) use ($next, $middleware) {
                     try {
+                        /** @var \Closure(CacheContext):PromiseInterface<T> $next */
                         return $middleware->handle($context, $next);
                     } catch (\Throwable $e) {
                         return \React\Promise\reject($e);

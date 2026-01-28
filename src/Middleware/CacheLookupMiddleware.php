@@ -37,14 +37,14 @@ use Psr\Log\LoggerInterface;
 use React\Promise\PromiseInterface;
 
 /**
- * Core middleware for initial cache retrieval and freshness validation
+ * Core middleware for initial cache retrieval and freshness validation.
  */
 class CacheLookupMiddleware implements MiddlewareInterface
 {
     /**
-     * @param  CacheStorage                   $storage     The cache interaction layer
-     * @param  LoggerInterface                $logger      Logging implementation
-     * @param  EventDispatcherInterface|null  $dispatcher  Event dispatcher for telemetry
+     * @param CacheStorage                  $storage    The cache interaction layer
+     * @param LoggerInterface               $logger     Logging implementation
+     * @param EventDispatcherInterface|null $dispatcher Event dispatcher for telemetry
      */
     public function __construct(
         private CacheStorage $storage,
@@ -54,21 +54,24 @@ class CacheLookupMiddleware implements MiddlewareInterface
     }
 
     /**
-     * Performs initial cache lookup and handles freshness validation
+     * Performs initial cache lookup and handles freshness validation.
      *
-     * @param  CacheContext  $context  The resolution state
-     * @param  callable      $next     Next handler in the chain
-     * @return PromiseInterface        Promise resolving to cached or fresh data
+     * @template T
+     *
+     * @param  callable(CacheContext):PromiseInterface<T> $next
+     * @return PromiseInterface<T>
      */
-    public function handle(CacheContext $context, callable $next) : PromiseInterface
+    public function handle(CacheContext $context, callable $next): PromiseInterface
     {
         // Basic tracing for debugging
         $this->logger->debug('CacheLookupMiddleware: handling cache context', ['key' => $context->key, 'strategy' => $context->options->strategy->value]);
-        if ($context->options->strategy === CacheStrategy::ForceRefresh) {
+        if (CacheStrategy::ForceRefresh === $context->options->strategy) {
             $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Bypass, 0, $context->options->tags));
+
             return $next($context);
         }
 
+        /** @var PromiseInterface<T> $promise */
         $promise = $this->storage->get($context->key, $context->options)->then(
             function ($cached_item) use ($context, $next) {
                 if ($cached_item instanceof CachedItem) {
@@ -94,19 +97,25 @@ class CacheLookupMiddleware implements MiddlewareInterface
                             return $next($context);
                         }
 
-                        return \React\Promise\resolve($cached_item->data);
+                        /** @var T $item_data */
+                        $item_data = $cached_item->data;
+
+                        return \React\Promise\resolve($item_data);
                     }
 
-                    if ($context->options->strategy === CacheStrategy::Background) {
+                    if (CacheStrategy::Background === $context->options->strategy) {
                         $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, microtime(true) - $context->start_time, $context->options->tags));
                         $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $cached_item->data));
 
                         // Background fetch - catch errors to prevent unhandled rejection since this promise is not returned
-                        $next($context)->catch(function(\Throwable $e) {
+                        $next($context)->catch(function (\Throwable $e) use ($context) {
                             $this->logger->error('AsyncCache BACKGROUND_FETCH_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
                         });
 
-                        return \React\Promise\resolve($cached_item->data);
+                        /** @var T $item_data */
+                        $item_data = $cached_item->data;
+
+                        return \React\Promise\resolve($item_data);
                     }
                 }
 
@@ -114,11 +123,12 @@ class CacheLookupMiddleware implements MiddlewareInterface
             },
             function (\Throwable $e) use ($context, $next) {
                 $this->logger->error('AsyncCache CACHE_LOOKUP_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
+
                 return $next($context);
             }
         );
 
-        $promise->catch(function(\Throwable $e) use ($context) {
+        $promise->catch(function (\Throwable $e) use ($context) {
             $this->logger->debug('AsyncCache LOOKUP_PIPELINE_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
         });
 

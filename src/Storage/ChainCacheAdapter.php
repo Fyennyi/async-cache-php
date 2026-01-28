@@ -27,20 +27,20 @@ namespace Fyennyi\AsyncCache\Storage;
 
 use Psr\SimpleCache\CacheInterface as PsrCacheInterface;
 use React\Cache\CacheInterface as ReactCacheInterface;
-use function React\Promise\all;
 use React\Promise\PromiseInterface;
+use function React\Promise\all;
 
 /**
- * Asynchronous adapter that chains multiple cache layers (L1, L2, L3...)
+ * Asynchronous adapter that chains multiple cache layers (L1, L2, L3...).
  */
 class ChainCacheAdapter implements AsyncCacheAdapterInterface
 {
     /** @var AsyncCacheAdapterInterface[] Ordered list of asynchronous adapters */
     private array $adapters = [];
 
-     /**
-      * @param  AsyncCacheAdapterInterface[]  $adapters  Ordered list of adapters (Psr, React or Async)
-      */
+    /**
+     * @param AsyncCacheAdapterInterface[] $adapters Ordered list of adapters (Psr, React or Async)
+     */
     public function __construct(array $adapters)
     {
         foreach ($adapters as $adapter) {
@@ -55,24 +55,21 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
     }
 
     /**
-     * Retrieves an item from the first layer that has it, then backfills upper layers
+     * @inheritDoc
      *
-     * @param  string  $key  The unique key of this item in the cache
-     * @return PromiseInterface Resolves to the cached value or null on miss
+     * @return PromiseInterface<mixed>
      */
-    public function get(string $key) : PromiseInterface
+    public function get(string $key): PromiseInterface
     {
         return $this->resolveLayer($key, 0);
     }
 
     /**
-     * Recursive resolution of cache layers with asynchronous backfilling
-     *
-     * @param  string    $key       Cache key to find
-     * @param  int       $index     Current layer index in the adapters array
-     * @return PromiseInterface
+     * @param  string                  $key   Identifier
+     * @param  int                     $index Current adapter index
+     * @return PromiseInterface<mixed>
      */
-    private function resolveLayer(string $key, int $index) : PromiseInterface
+    private function resolveLayer(string $key, int $index): PromiseInterface
     {
         if (! isset($this->adapters[$index])) {
             return \React\Promise\resolve(null);
@@ -80,11 +77,12 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
 
         return $this->adapters[$index]->get($key)->then(
             function ($value) use ($key, $index) {
-                if ($value !== null) {
+                if (null !== $value) {
                     // Backfill: populate all faster layers above this one asynchronously
                     for ($i = 0; $i < $index && isset($this->adapters[$i]); $i++) {
                         $this->adapters[$i]->set($key, $value);
                     }
+
                     return $value;
                 }
 
@@ -99,38 +97,47 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
     }
 
     /**
-     * Obtains multiple cache items by their unique keys
+     * @inheritDoc
      *
-     * @param  iterable<string>  $keys  A list of keys that can be obtained in a single operation
-     * @return PromiseInterface         Resolves to an array of key => value pairs
+     * @return PromiseInterface<iterable<string,  mixed>>
      */
-    public function getMultiple(iterable $keys) : PromiseInterface
+    public function getMultiple(iterable $keys): PromiseInterface
     {
-        $results = [];
-        $promises = [];
-        /** @var array<string> $keys_array */
+        /** @var string[] $keys_array */
         $keys_array = is_array($keys) ? $keys : iterator_to_array($keys);
 
         if (empty($keys_array)) {
-            return \React\Promise\resolve([]);
+            /** @var array<string, mixed> $empty */
+            $empty = [];
+            /** @var PromiseInterface<array<string, mixed>> $res */
+            $res = \React\Promise\resolve($empty);
+
+            return $res;
         }
 
+        /** @var array<int, PromiseInterface<mixed>> $promises */
+        $promises = [];
         foreach ($keys_array as $key) {
-            $promises[$key] = $this->get($key);
+            $promises[] = $this->get($key);
         }
 
-        return all($promises);
+        /** @var PromiseInterface<array<string, mixed>> $all_promise */
+        $all_promise = all($promises)->then(function (array $results) use ($keys_array) {
+            /** @var array<string, mixed> $combined */
+            $combined = array_combine($keys_array, $results);
+
+            return $combined;
+        });
+
+        return $all_promise;
     }
 
     /**
-     * Persists data in all cache layers concurrently
+     * @inheritDoc
      *
-     * @param  string    $key    The key of the item to store
-     * @param  mixed     $value  The value of the item to store
-     * @param  int|null  $ttl    Optional. The TTL value of this item
-     * @return PromiseInterface  Resolves to true on success
+     * @return PromiseInterface<bool>
      */
-    public function set(string $key, mixed $value, ?int $ttl = null) : PromiseInterface
+    public function set(string $key, mixed $value, ?int $ttl = null): PromiseInterface
     {
         if (empty($this->adapters)) {
             return \React\Promise\resolve(true);
@@ -141,16 +148,15 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
             $promises[] = $adapter->set($key, $value, $ttl);
         }
 
-        return all($promises)->then(fn() => true);
+        return all($promises)->then(fn () => true);
     }
 
     /**
-     * Deletes an item from all cache layers concurrently
+     * @inheritDoc
      *
-     * @param  string  $key  The unique cache key of the item to delete
-     * @return PromiseInterface
+     * @return PromiseInterface<bool>
      */
-    public function delete(string $key) : PromiseInterface
+    public function delete(string $key): PromiseInterface
     {
         if (empty($this->adapters)) {
             return \React\Promise\resolve(true);
@@ -161,15 +167,15 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
             $promises[] = $adapter->delete($key);
         }
 
-        return all($promises)->then(fn() => true);
+        return all($promises)->then(fn () => true);
     }
 
     /**
-     * Wipes clean all cache layers concurrently
+     * @inheritDoc
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<bool>
      */
-    public function clear() : PromiseInterface
+    public function clear(): PromiseInterface
     {
         if (empty($this->adapters)) {
             return \React\Promise\resolve(true);
@@ -180,6 +186,6 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
             $promises[] = $adapter->clear();
         }
 
-        return all($promises)->then(fn() => true);
+        return all($promises)->then(fn () => true);
     }
 }

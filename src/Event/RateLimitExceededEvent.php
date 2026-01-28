@@ -26,13 +26,13 @@
 namespace Fyennyi\AsyncCache\Event;
 
 /**
- * Event dispatched when a request is blocked by the rate limiter
+ * Event dispatched when a request is blocked by the rate limiter.
  */
 class RateLimitExceededEvent extends AsyncCacheEvent
 {
     /**
-     * @param  string  $key             The resource key being requested
-     * @param  string  $rate_limit_key  The identifier of the rate limit bucket
+     * @param string $key            The resource key being requested
+     * @param string $rate_limit_key The identifier of the rate limit bucket
      */
     public function __construct(string $key, public readonly string $rate_limit_key)
     {

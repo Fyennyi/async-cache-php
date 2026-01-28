@@ -25,25 +25,25 @@
 
 namespace Fyennyi\AsyncCache\Bridge\Laravel;
 
+use Fyennyi\AsyncCache\AsyncCacheBuilder;
 use Fyennyi\AsyncCache\AsyncCacheManager;
 use Illuminate\Support\ServiceProvider;
 
 /**
- * Service Provider for Laravel integration
+ * Service Provider for Laravel integration.
  */
 class AsyncCacheServiceProvider extends ServiceProvider
 {
     /**
-     * Register services in the container
-     *
-     * @return void
+     * Register services in the container.
      */
-    public function register() : void
+    public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../../../config/async-cache.php', 'async-cache');
 
         $this->app->singleton(AsyncCacheManager::class, function ($app) {
             $config = $app['config']['async-cache'];
+
             return AsyncCacheBuilder::create($app[$config['adapter']])
                 ->withLogger($app['log'])
                 ->build();
@@ -51,14 +51,12 @@ class AsyncCacheServiceProvider extends ServiceProvider
     }
 
     /**
-     * Bootstrap services
-     *
-     * @return void
+     * Bootstrap services.
      */
-    public function boot() : void
+    public function boot(): void
     {
         $this->publishes([
-            __DIR__ . '/../../../config/async-cache.php' => config_path('async-cache.php'),
+            __DIR__ . '/../../../config/async-cache.php' => \config_path('async-cache.php'),
         ], 'config');
     }
 }

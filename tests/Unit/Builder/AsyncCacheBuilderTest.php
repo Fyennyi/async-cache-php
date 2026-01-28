@@ -6,18 +6,17 @@ use Fyennyi\AsyncCache\AsyncCacheBuilder;
 use Fyennyi\AsyncCache\AsyncCacheManager;
 use Fyennyi\AsyncCache\Middleware\MiddlewareInterface;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
-use Symfony\Component\RateLimiter\LimiterInterface;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\InMemoryStore;
+use Symfony\Component\RateLimiter\LimiterInterface;
 
 class AsyncCacheBuilderTest extends TestCase
 {
-    public function testBuildsManagerWithDefaults() : void
+    public function testBuildsManagerWithDefaults(): void
     {
         $cache = $this->createMock(CacheInterface::class);
         $manager = AsyncCacheBuilder::create($cache)->build();
@@ -25,7 +24,7 @@ class AsyncCacheBuilderTest extends TestCase
         $this->assertInstanceOf(AsyncCacheManager::class, $manager);
     }
 
-    public function testBuildsManagerWithCustomDependencies() : void
+    public function testBuildsManagerWithCustomDependencies(): void
     {
         $cache = $this->createMock(CacheInterface::class);
         $limiter = $this->createMock(LimiterInterface::class);
@@ -45,7 +44,7 @@ class AsyncCacheBuilderTest extends TestCase
             ->build();
 
         $this->assertInstanceOf(AsyncCacheManager::class, $manager);
-        
+
         // We can't easily inspect private properties, but successful instantiation
         // with these inputs confirms the builder logic works.
     }

@@ -29,7 +29,7 @@ use Fyennyi\AsyncCache\CacheOptions;
 use Fyennyi\AsyncCache\Model\CachedItem;
 
 /**
- * Data Transfer Object that carries the state of a single cache resolution through the middleware pipeline
+ * Data Transfer Object that carries the state of a single cache resolution through the middleware pipeline.
  */
 class CacheContext
 {
@@ -40,9 +40,9 @@ class CacheContext
     public float $start_time;
 
     /**
-     * @param  string        $key              The cache key identifier
-     * @param  mixed         $promise_factory  Callback to fetch fresh data from source
-     * @param  CacheOptions  $options          Resolved caching options for this request
+     * @param string       $key             The cache key identifier
+     * @param mixed        $promise_factory Callback to fetch fresh data from source
+     * @param CacheOptions $options         Resolved caching options for this request
      */
     public function __construct(
         public readonly string $key,

@@ -1,13 +1,13 @@
 <?php
 
 /*
- * 
+ *
  *     _                          ____           _            ____  _   _ ____
  *    / \   ___ _   _ _ __   ___ / ___|__ _  ___| |__   ___  |  _ \| | | |  _ \
  *   / _ \ / __| | | | '_ \ / __| |   / _` |/ __| '_ \ / _ \ | |_) | |_| | |_) |
  *  / ___ \\__ \ |_| | | | | (__| |__| (_| | (__| | | |  __/ |  __/|  _  |  __/
- * /_/   \_\___/\__, |_| |_|\___|\____\__,_|\___|_| |_|\___| |_|   |_| |_|_| 
- *              |___/ 
+ * /_/   \_\___/\__, |_| |_|\___|\____\__,_|\___|_| |_|\___| |_|   |_| |_|_|
+ *              |___/
  *
  * This program is free software: you can redistribute and/or modify
  * it under the terms of the CSSM Unlimited License v2.0.
@@ -45,13 +45,13 @@ use Psr\SimpleCache\CacheInterface as PsrCacheInterface;
 use React\Cache\CacheInterface as ReactCacheInterface;
 use React\Promise\Deferred;
 use React\Promise\PromiseInterface;
-use function React\Promise\Timer\resolve as delay;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\SemaphoreStore;
 use Symfony\Component\RateLimiter\LimiterInterface;
+use function React\Promise\Timer\resolve as delay;
 
 /**
- * Universal Asynchronous Cache Manager powered by ReactPHP Promises
+ * Universal Asynchronous Cache Manager powered by ReactPHP Promises.
  */
 class AsyncCacheManager
 {
@@ -60,13 +60,13 @@ class AsyncCacheManager
     private LockFactory $lock_factory;
 
     /**
-     * @param  PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface  $cache_adapter  The cache implementation
-     * @param  LimiterInterface|null                                             $rate_limiter   The Symfony Rate Limiter implementation
-     * @param  LoggerInterface|null                                              $logger         The PSR-3 logger implementation
-     * @param  LockFactory|null                                                  $lock_factory   The Symfony Lock Factory
-     * @param  \Fyennyi\AsyncCache\Middleware\MiddlewareInterface[]              $middlewares    Optional custom middleware stack
-     * @param  EventDispatcherInterface|null                                     $dispatcher     The PSR-14 event dispatcher
-     * @param  SerializerInterface|null                                          $serializer     The custom serializer
+     * @param PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter The cache implementation
+     * @param LimiterInterface|null                                            $rate_limiter  The Symfony Rate Limiter implementation
+     * @param LoggerInterface|null                                             $logger        The PSR-3 logger implementation
+     * @param LockFactory|null                                                 $lock_factory  The Symfony Lock Factory
+     * @param \Fyennyi\AsyncCache\Middleware\MiddlewareInterface[]             $middlewares   Optional custom middleware stack
+     * @param EventDispatcherInterface|null                                    $dispatcher    The PSR-14 event dispatcher
+     * @param SerializerInterface|null                                         $serializer    The custom serializer
      */
     public function __construct(
         PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter,
@@ -102,36 +102,41 @@ class AsyncCacheManager
     }
 
     /**
-     * Wraps an operation with caching and returns a Promise
+     * Wraps an operation with caching and returns a Promise.
      *
-     * @param  string        $key              Unique cache key identifier for the operation
-     * @param  callable      $promise_factory  Callback function that returns a value or a promise
-     * @param  CacheOptions  $options          Caching configuration for this specific request
-     * @return PromiseInterface                A promise representing the eventual result of the operation
+     * @param  string                  $key             Unique cache key identifier for the operation
+     * @param  callable                $promise_factory Callback function that returns a value or a promise
+     * @param  CacheOptions            $options         Caching configuration for this specific request
+     * @return PromiseInterface<mixed> A promise representing the eventual result of the operation
      */
-    public function wrap(string $key, callable $promise_factory, CacheOptions $options) : PromiseInterface
+    public function wrap(string $key, callable $promise_factory, CacheOptions $options): PromiseInterface
     {
         $context = new CacheContext($key, $promise_factory, $options);
 
         // Execute the pipeline.
         return $this->pipeline->send($context, function (CacheContext $ctx) {
-            $result = ($ctx->promise_factory)();
+            /** @var callable $factory */
+            $factory = $ctx->promise_factory;
+            /** @var mixed $result */
+            $result = $factory();
+
             return $result instanceof PromiseInterface ? $result : \React\Promise\resolve($result);
         });
     }
 
     /**
-     * Atomically increments a cached integer value
+     * Atomically increments a cached integer value.
      *
-     * @param  string             $key      The cache key to increment identifier
-     * @param  int                $step     Value to add to the existing counter
-     * @param  CacheOptions|null  $options  Optional caching options for persistence
-     * @return PromiseInterface             Promise resolving to the new integer value after increment
+     * @param  string                $key     The cache key to increment identifier
+     * @param  int                   $step    Value to add to the existing counter
+     * @param  CacheOptions|null     $options Optional caching options for persistence
+     * @return PromiseInterface<int> Promise resolving to the new integer value after increment
      */
-    public function increment(string $key, int $step = 1, ?CacheOptions $options = null) : PromiseInterface
+    public function increment(string $key, int $step = 1, ?CacheOptions $options = null): PromiseInterface
     {
         $options = $options ?? new CacheOptions();
         $lock_key = 'lock:counter:' . $key;
+        /** @var Deferred<int> $master_deferred */
         $master_deferred = new Deferred();
 
         $start_time = microtime(true);
@@ -168,11 +173,13 @@ class AsyncCacheManager
                         $master_deferred->reject($e);
                     }
                 );
+
                 return;
             }
 
             if (microtime(true) - $start_time >= $timeout) {
                 $master_deferred->reject(new \RuntimeException("Could not acquire lock for incrementing key: $key"));
+
                 return;
             }
 
@@ -185,66 +192,64 @@ class AsyncCacheManager
     }
 
     /**
-     * Atomically decrements a cached integer value
+     * Atomically decrements a cached integer value.
      *
-     * @param  string             $key      The cache key identifier to decrement
-     * @param  int                $step     Value to subtract from the existing counter
-     * @param  CacheOptions|null  $options  Optional caching options for persistence
-     * @return PromiseInterface             Promise resolving to the new integer value after decrement
+     * @param  string                $key     The cache key identifier to decrement
+     * @param  int                   $step    Value to subtract from the existing counter
+     * @param  CacheOptions|null     $options Optional caching options for persistence
+     * @return PromiseInterface<int> Promise resolving to the new integer value after decrement
      */
-    public function decrement(string $key, int $step = 1, ?CacheOptions $options = null) : PromiseInterface
+    public function decrement(string $key, int $step = 1, ?CacheOptions $options = null): PromiseInterface
     {
         return $this->increment($key, -$step, $options);
     }
 
     /**
-     * Invalidates all cache entries associated with the given tags
+     * Invalidates all cache entries associated with the given tags.
      *
-     * @param  string[]  $tags  List of tag names to invalidate
-     * @return PromiseInterface Resolves to true on successful invalidation
+     * @param  string[]               $tags List of tag names to invalidate
+     * @return PromiseInterface<bool> Resolves to true on successful invalidation
      */
-    public function invalidateTags(array $tags) : PromiseInterface
+    public function invalidateTags(array $tags): PromiseInterface
     {
         return $this->storage->invalidateTags($tags);
     }
 
     /**
-     * Clears the entire cache storage
+     * Clears the entire cache storage.
      *
-     * @return PromiseInterface Resolves to true on successful wipe
+     * @return PromiseInterface<bool> Resolves to true on successful wipe
      */
-    public function clear() : PromiseInterface
+    public function clear(): PromiseInterface
     {
         return $this->storage->clear();
     }
 
     /**
-     * Deletes a specific item from the cache
+     * Deletes a specific item from the cache.
      *
-     * @param  string  $key  Item identifier to remove
-     * @return PromiseInterface Promise resolving to true on successful deletion
+     * @param  string                 $key Item identifier to remove
+     * @return PromiseInterface<bool> Promise resolving to true on successful deletion
      */
-    public function delete(string $key) : PromiseInterface
+    public function delete(string $key): PromiseInterface
     {
         return $this->storage->delete($key);
     }
 
     /**
-     * Returns the rate limiter instance
+     * Returns the rate limiter instance.
      *
      * @return LimiterInterface|null The Symfony Rate Limiter or null if not set
      */
-    public function getRateLimiter() : ?LimiterInterface
+    public function getRateLimiter(): ?LimiterInterface
     {
         return $this->rate_limiter;
     }
 
     /**
-     * Resets the rate limiter state
-     *
-     * @return void
+     * Resets the rate limiter state.
      */
-    public function clearRateLimiter() : void
+    public function clearRateLimiter(): void
     {
         $this->rate_limiter?->reset();
     }

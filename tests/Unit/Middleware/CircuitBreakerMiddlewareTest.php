@@ -16,7 +16,7 @@ class CircuitBreakerMiddlewareTest extends TestCase
     private MockObject|CacheInterface $storage;
     private CircuitBreakerMiddleware $middleware;
 
-    protected function setUp() : void
+    protected function setUp(): void
     {
         $this->storage = $this->createMock(CacheInterface::class);
         $this->middleware = new CircuitBreakerMiddleware(
@@ -27,21 +27,23 @@ class CircuitBreakerMiddlewareTest extends TestCase
         );
     }
 
-    public function testAllowsRequestWhenClosed() : void
+    public function testAllowsRequestWhenClosed(): void
     {
-        $context = new CacheContext('k', fn()=>null, new CacheOptions());
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
         $this->storage->method('get')->willReturn('closed');
 
-        $next = function() {
-            $d = new Deferred(); $d->resolve('ok'); return $d->future();
+        $next = function () {
+            $d = new Deferred();
+            $d->resolve('ok');
+            return $d->future();
         };
 
         $this->assertSame('ok', $this->middleware->handle($context, $next)->wait());
     }
 
-    public function testBlocksRequestWhenOpenAndFresh() : void
+    public function testBlocksRequestWhenOpenAndFresh(): void
     {
-        $context = new CacheContext('k', fn()=>null, new CacheOptions());
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
         $this->storage->method('get')->willReturnMap([
             ['cb:k:state', 'closed', 'open'],
             ['cb:k:last_failure', 0, time()] // failed just now
@@ -51,72 +53,93 @@ class CircuitBreakerMiddlewareTest extends TestCase
         $this->expectExceptionMessage('Circuit Breaker is OPEN');
 
         // Next should not be called, but providing a dummy just in case
-        $next = fn() => (new Deferred())->future();
+        $next = fn () => (new Deferred())->future();
         $this->middleware->handle($context, $next)->wait();
     }
 
-    public function testAllowsProbeWhenOpenAndExpired() : void
+    public function testAllowsProbeWhenOpenAndExpired(): void
     {
-        $context = new CacheContext('k', fn()=>null, new CacheOptions());
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
         $this->storage->method('get')->willReturnMap([
             ['cb:k:state', 'closed', 'open'],
             ['cb:k:last_failure', 0, time() - 61] // failed long ago
         ]);
 
-        $this->storage->expects($this->exactly(3))->method('set')->willReturnCallback(function($k, $v) {
-             if ($k === 'cb:k:state' && $v === 'half_open') return true;
-             if ($k === 'cb:k:state' && $v === 'closed') return true;
-             if ($k === 'cb:k:failures' && $v === 0) return true;
-             return true;
+        $this->storage->expects($this->exactly(3))->method('set')->willReturnCallback(function ($k, $v) {
+            if ('cb:k:state' === $k && 'half_open' === $v) {
+                return true;
+            }
+            if ('cb:k:state' === $k && 'closed' === $v) {
+                return true;
+            }
+            if ('cb:k:failures' === $k && 0 === $v) {
+                return true;
+            }
+            return true;
         });
 
-        $next = function() {
-            $d = new Deferred(); $d->resolve('ok'); return $d->future();
+        $next = function () {
+            $d = new Deferred();
+            $d->resolve('ok');
+            return $d->future();
         };
 
         $this->assertSame('ok', $this->middleware->handle($context, $next)->wait());
     }
 
-    public function testRecordsFailureAndOpensCircuit() : void
+    public function testRecordsFailureAndOpensCircuit(): void
     {
-        $context = new CacheContext('k', fn()=>null, new CacheOptions());
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
         $this->storage->method('get')->willReturnMap([
             ['cb:k:state', 'closed', 'closed'],
             ['cb:k:failures', 0, 1] // already 1 failure
         ]);
 
         $called = 0;
-        $this->storage->method('set')->willReturnCallback(function($key, $val) use (&$called) {
+        $this->storage->method('set')->willReturnCallback(function ($key, $val) use (&$called) {
             $called++;
-            if ($called === 1) $this->assertSame('cb:k:failures', $key);
-            if ($called === 2) $this->assertSame('cb:k:state', $key);
+            if (1 === $called) {
+                $this->assertSame('cb:k:failures', $key);
+            }
+            if (2 === $called) {
+                $this->assertSame('cb:k:state', $key);
+            }
             return true;
         });
 
-        $next = function() {
-            $d = new Deferred(); $d->reject(new \Exception('fail')); return $d->future();
+        $next = function () {
+            $d = new Deferred();
+            $d->reject(new \Exception('fail'));
+            return $d->future();
         };
 
         try {
             $this->middleware->handle($context, $next)->wait();
-        } catch (\Exception $e) {}
-        
+        } catch (\Exception $e) {
+        }
+
         $this->assertGreaterThanOrEqual(2, $called);
     }
 
-    public function testResetsOnSuccess() : void
+    public function testResetsOnSuccess(): void
     {
-        $context = new CacheContext('k', fn()=>null, new CacheOptions());
+        $context = new CacheContext('k', fn () => null, new CacheOptions());
         $this->storage->method('get')->willReturn('closed');
 
-        $this->storage->method('set')->willReturnCallback(function($k, $v) {
-            if ($k === 'cb:k:state') $this->assertSame('closed', $v);
-            if ($k === 'cb:k:failures') $this->assertSame(0, $v);
+        $this->storage->method('set')->willReturnCallback(function ($k, $v) {
+            if ('cb:k:state' === $k) {
+                $this->assertSame('closed', $v);
+            }
+            if ('cb:k:failures' === $k) {
+                $this->assertSame(0, $v);
+            }
             return true;
         });
 
-        $next = function() {
-            $d = new Deferred(); $d->resolve('ok'); return $d->future();
+        $next = function () {
+            $d = new Deferred();
+            $d->resolve('ok');
+            return $d->future();
         };
 
         $this->middleware->handle($context, $next)->wait();

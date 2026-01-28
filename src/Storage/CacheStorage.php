@@ -31,9 +31,10 @@ use Fyennyi\AsyncCache\Serializer\PhpSerializer;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Psr\Log\LoggerInterface;
 use React\Promise\PromiseInterface;
+use function React\Promise\all;
 
 /**
- * High-level storage orchestrator that manages serialization and tag metadata
+ * High-level storage orchestrator that manages serialization and tag metadata.
  */
 class CacheStorage
 {
@@ -41,9 +42,9 @@ class CacheStorage
     private SerializerInterface $serializer;
 
     /**
-     * @param  AsyncCacheAdapterInterface  $adapter     The asynchronous cache adapter
-     * @param  LoggerInterface             $logger      Logger for reporting errors and debug info
-     * @param  SerializerInterface|null    $serializer  Custom serializer implementation
+     * @param AsyncCacheAdapterInterface $adapter    The asynchronous cache adapter
+     * @param LoggerInterface            $logger     Logger for reporting errors and debug info
+     * @param SerializerInterface|null   $serializer Custom serializer implementation
      */
     public function __construct(
         private AsyncCacheAdapterInterface $adapter,
@@ -54,17 +55,17 @@ class CacheStorage
     }
 
     /**
-     * Retrieves an item from the cache and handles basic integrity checks
+     * Retrieves an item from the cache and handles basic integrity checks.
      *
-     * @param  string        $key      The cache key identifier to retrieve
-     * @param  CacheOptions  $options  Configuration options for fail-safe retrieval
-     * @return PromiseInterface        Resolves to CachedItem object or null if not found/invalid
+     * @param  string                  $key     The cache key identifier to retrieve
+     * @param  CacheOptions            $options Configuration options for fail-safe retrieval
+     * @return PromiseInterface<mixed>
      */
-    public function get(string $key, CacheOptions $options) : PromiseInterface
+    public function get(string $key, CacheOptions $options): PromiseInterface
     {
         return $this->adapter->get($key)->then(
             function ($cached_item) use ($key) {
-                if ($cached_item === null) {
+                if (null === $cached_item) {
                     return null;
                 }
 
@@ -80,10 +81,11 @@ class CacheStorage
 
                 return $this->processDecompression($cached_item, $key);
             },
-            function ($e) use ($key, $options) {
+            function (\Throwable $e) use ($key, $options) {
                 if ($options->fail_safe) {
-                    $msg = $e instanceof \Throwable ? $e->getMessage() : (\is_scalar($e) || $e instanceof \Stringable ? (string)$e : 'Unknown error');
+                    $msg = $e->getMessage();
                     $this->logger->error('AsyncCache CACHE_GET_ERROR', ['key' => $key, 'error' => $msg]);
+
                     return null;
                 }
                 throw $e;
@@ -92,25 +94,27 @@ class CacheStorage
     }
 
     /**
-     * Stores an item in the cache asynchronously
+     * Stores an item in the cache asynchronously.
      *
-     * @param  string        $key              The cache key identifier
-     * @param  mixed         $data             The raw data value to store
-     * @param  CacheOptions  $options          Configuration for TTL, tags and compression
-     * @param  float         $generation_time  Time taken to generate the data in seconds
-     * @return PromiseInterface                Resolves to true on successful storage
+     * @param  string                 $key             The cache key identifier
+     * @param  mixed                  $data            The raw data value to store
+     * @param  CacheOptions           $options         Configuration for TTL, tags and compression
+     * @param  float                  $generation_time Time taken to generate the data in seconds
+     * @return PromiseInterface<bool>
      */
-    public function set(string $key, mixed $data, CacheOptions $options, float $generation_time = 0.0) : PromiseInterface
+    public function set(string $key, mixed $data, CacheOptions $options, float $generation_time = 0.0): PromiseInterface
     {
         $physical_ttl = $options->ttl + $options->stale_grace_period;
 
+        /** @param array<string, string> $tag_versions */
         $prepare_item = function (array $tag_versions) use ($data, $options, $generation_time) {
+            /** @var array<string, string> $tag_versions */
             $is_compressed = false;
             if ($options->compression) {
                 $serialized_data = $this->serializer->serialize($data);
                 if (strlen($serialized_data) >= $options->compression_threshold) {
                     $compressed_data = @gzcompress($serialized_data);
-                    if ($compressed_data !== false) {
+                    if (false !== $compressed_data) {
                         $data = $compressed_data;
                         $is_compressed = true;
                     }
@@ -129,6 +133,7 @@ class CacheStorage
         if (! empty($options->tags)) {
             return $this->fetchTagVersions($options->tags, true)->then(function ($tag_versions) use ($key, $physical_ttl, $prepare_item) {
                 $item = $prepare_item($tag_versions);
+
                 return $this->adapter->set($key, $item, $physical_ttl);
             });
         }
@@ -136,13 +141,13 @@ class CacheStorage
         return $this->adapter->set($key, $prepare_item([]), $physical_ttl);
     }
 
-     /**
-      * Invalidates specific tags asynchronously
-      *
-      * @param  string[]  $tags  List of tag names to invalidate
-      * @return PromiseInterface Resolving to true on successful invalidation of all tags
-      */
-    public function invalidateTags(array $tags) : PromiseInterface
+    /**
+     * Invalidates specific tags asynchronously.
+     *
+     * @param  string[]               $tags List of tag names to invalidate
+     * @return PromiseInterface<bool> Resolving to true on successful invalidation of all tags
+     */
+    public function invalidateTags(array $tags): PromiseInterface
     {
         if (empty($tags)) {
             return \React\Promise\resolve(true);
@@ -153,25 +158,27 @@ class CacheStorage
             $promises[] = $this->adapter->set(self::TAG_PREFIX . $tag, $this->generateVersion());
         }
 
-        return all($promises)->then(function() use ($tags) {
+        return all($promises)->then(function () use ($tags) {
             $this->logger->info('AsyncCache TAGS_INVALIDATED', ['tags' => $tags]);
+
             return true;
         });
     }
 
     /**
-     * Internal helper for decompression
+     * Internal helper for decompression.
      *
-     * @param  CachedItem  $cached_item  The cached item instance to decompress if needed
-     * @param  string      $key          The cache key for logging purposes
-     * @return CachedItem|null           The decompressed item object or null on error
+     * @param  CachedItem      $cached_item The cached item instance to decompress if needed
+     * @param  string          $key         The cache key for logging purposes
+     * @return CachedItem|null The decompressed item object or null on error
      */
-    private function processDecompression(CachedItem $cached_item, string $key) : ?CachedItem
+    private function processDecompression(CachedItem $cached_item, string $key): ?CachedItem
     {
         if ($cached_item->is_compressed && is_string($cached_item->data)) {
             $decompressed_data = @gzuncompress($cached_item->data);
-            if ($decompressed_data !== false) {
+            if (false !== $decompressed_data) {
                 $data = $this->serializer->unserialize($decompressed_data);
+
                 return new CachedItem(
                     data: $data,
                     logical_expire_time: $cached_item->logical_expire_time,
@@ -182,25 +189,28 @@ class CacheStorage
                 );
             }
             $this->logger->error('AsyncCache DECOMPRESSION_ERROR', ['key' => $key]);
+
             return null;
         }
+
         return $cached_item;
     }
 
-     /**
-      * Fetches current versions for a set of tags asynchronously
-      *
-      * @param  string[]  $tags            List of tag names to fetch
-      * @param  bool      $create_missing  Whether to initialize missing tags with a new unique version
-      * @return PromiseInterface           Resolves to an associative array of tag => version pairs
-      */
-    public function fetchTagVersions(array $tags, bool $create_missing = false) : PromiseInterface
+    /**
+     * Retrieves current versions for a set of tags.
+     *
+     * @param  string[]                                $tags           List of tags to fetch
+     * @param  bool                                    $create_missing Whether to generate and store new versions for missing tags
+     * @return PromiseInterface<array<string, string>> Resolves to array of [tag => version]
+     */
+    public function fetchTagVersions(array $tags, bool $create_missing = false): PromiseInterface
     {
         if (empty($tags)) {
             return \React\Promise\resolve([]);
         }
 
-        $keys = array_map(fn($t) => self::TAG_PREFIX . $t, $tags);
+        $keys = array_map(fn ($t) => self::TAG_PREFIX . $t, $tags);
+
         return $this->adapter->getMultiple($keys)->then(function ($raw_versions) use ($tags, $create_missing) {
             $versions = [];
             $set_promises = [];
@@ -208,7 +218,7 @@ class CacheStorage
 
             foreach ($tags as $tag) {
                 $version = $raw_versions[self::TAG_PREFIX . $tag] ?? null;
-                if ($version === null && $create_missing) {
+                if (null === $version && $create_missing) {
                     $version = $this->generateVersion();
                     $set_promises[] = $this->adapter->set(self::TAG_PREFIX . $tag, $version, 86400 * 30);
                 }
@@ -219,48 +229,50 @@ class CacheStorage
                 return $versions;
             }
 
-            return all($set_promises)->then(fn() => $versions);
+            return all($set_promises)->then(fn () => $versions);
         });
     }
 
     /**
-     * Generates a unique version string for tags
+     * Generates a unique version string for tags.
      *
      * @return string A unique identifier for the tag version
      */
-    private function generateVersion() : string
+    private function generateVersion(): string
     {
         return uniqid('', true);
     }
 
     /**
-     * Deletes an item from the cache by its unique key asynchronously
+     * Deletes an item from the cache by its unique key asynchronously.
      *
-     * @param  string  $key  The unique cache key identifier of the item to delete
-     * @return PromiseInterface Resolving to true on success
+     * @param  string                 $key The unique cache key identifier of the item to delete
+     * @return PromiseInterface<bool>
      */
-    public function delete(string $key) : PromiseInterface
+    public function delete(string $key): PromiseInterface
     {
         return $this->adapter->delete($key);
     }
 
     /**
-     * Wipes clean the entire cache's keys asynchronously
+     * Wipes clean the entire cache's keys asynchronously.
      *
-     * @return PromiseInterface Resolving to true on success
+     * @return PromiseInterface<bool>
      */
-    public function clear() : PromiseInterface
+    public function clear(): PromiseInterface
     {
         return $this->adapter->clear();
     }
 
     /**
-     * Returns the underlying asynchronous cache adapter
+     * Returns the underlying asynchronous cache adapter.
      *
      * @return AsyncCacheAdapterInterface The low-level adapter implementation
      */
-    public function getAdapter() : AsyncCacheAdapterInterface
+    public function getAdapter(): AsyncCacheAdapterInterface
     {
         return $this->adapter;
     }
-}
+}/**
+ * @return PromiseInterface<array<string, string>> Resolves to array of [tag => version]
+ */

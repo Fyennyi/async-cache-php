@@ -28,7 +28,7 @@ namespace Fyennyi\AsyncCache;
 use Fyennyi\AsyncCache\Enum\CacheStrategy;
 
 /**
- * Builder for CacheOptions DTO
+ * Builder for CacheOptions DTO.
  */
 class CacheOptionsBuilder
 {
@@ -45,143 +45,154 @@ class CacheOptionsBuilder
     private array $tags = [];
 
     /**
-     * Entry point for the fluent builder
+     * Entry point for the fluent builder.
      *
      * @return self New builder instance
      */
-    public static function create() : self
+    public static function create(): self
     {
         return new self();
     }
 
     /**
-     * Sets the logical Time-To-Live
+     * Sets the logical Time-To-Live.
      *
-     * @param  int|null  $ttl  Seconds until data is considered stale
-     * @return self            Current builder instance
+     * @param  int|null $ttl Seconds until data is considered stale
+     * @return self     Current builder instance
      */
-    public function withTtl(?int $ttl) : self
+    public function withTtl(?int $ttl): self
     {
         $this->ttl = $ttl;
+
         return $this;
     }
 
     /**
-     * Configures the physical grace period for stale data
+     * Configures the physical grace period for stale data.
      *
-     * @param  int  $seconds  Seconds to keep data after TTL expires
-     * @return self           Current builder instance
+     * @param  int  $seconds Seconds to keep data after TTL expires
+     * @return self Current builder instance
      */
-    public function withStaleGracePeriod(int $seconds) : self
+    public function withStaleGracePeriod(int $seconds): self
     {
         $this->stale_grace_period = $seconds;
+
         return $this;
     }
 
     /**
-     * Sets the caching strategy
+     * Sets the caching strategy.
      *
-     * @param  CacheStrategy  $strategy  Strategy identifier
-     * @return self                      Current builder instance
+     * @param  CacheStrategy $strategy Strategy identifier
+     * @return self          Current builder instance
      */
-    public function withStrategy(CacheStrategy $strategy) : self
+    public function withStrategy(CacheStrategy $strategy): self
     {
         $this->strategy = $strategy;
+
         return $this;
     }
 
     /**
-     * Enables background revalidation strategy
+     * Enables background revalidation strategy.
      *
      * @return self Current builder instance
      */
-    public function withBackgroundRefresh() : self
+    public function withBackgroundRefresh(): self
     {
         $this->strategy = CacheStrategy::Background;
+
         return $this;
     }
 
     /**
-     * Enables force refresh strategy (bypass cache)
+     * Enables force refresh strategy (bypass cache).
      *
      * @return self Current builder instance
      */
-    public function withForceRefresh() : self
+    public function withForceRefresh(): self
     {
         $this->strategy = CacheStrategy::ForceRefresh;
+
         return $this;
     }
 
     /**
-     * Configures data compression
+     * Configures data compression.
      *
-     * @param  bool  $enabled    Whether to enable compression
-     * @param  int   $threshold  Minimum data size in bytes to trigger compression
-     * @return self              Current builder instance
+     * @param  bool $enabled   Whether to enable compression
+     * @param  int  $threshold Minimum data size in bytes to trigger compression
+     * @return self Current builder instance
      */
-    public function withCompression(bool $enabled = true, int $threshold = 1024) : self
+    public function withCompression(bool $enabled = true, int $threshold = 1024): self
     {
         $this->compression = $enabled;
         $this->compression_threshold = $threshold;
+
         return $this;
     }
 
     /**
-     * Configures fail-safe behavior
+     * Configures fail-safe behavior.
      *
-     * @param  bool  $enabled  Whether to catch adapter exceptions
-     * @return self            Current builder instance
+     * @param  bool $enabled Whether to catch adapter exceptions
+     * @return self Current builder instance
      */
-    public function withFailSafe(bool $enabled = true) : self
+    public function withFailSafe(bool $enabled = true): self
     {
         $this->fail_safe = $enabled;
+
         return $this;
     }
 
     /**
-     * Configures X-Fetch probabilistic early expiration
+     * /
+     * Configures X-Fetch probabilistic early expiration.
      *
-     * @param  float  $beta  Beta coefficient (0 to disable)
-     * @return self          Current builder instance
+     * @param  float $beta Beta coefficient (0 to disable)
+     * @return self  Current builder instance
      */
-    public function withXFetch(float $beta = 1.0) : self
+    public function withXFetch(float $beta = 1.0): self
     {
         $this->x_fetch_beta = $beta;
+
         return $this;
     }
 
     /**
-     * Configures rate limiting for the request
+     * Configures rate limiting for the request.
      *
-     * @param  string  $key          Identifier for rate limit grouping
-     * @param  bool    $serve_stale  Whether to return stale data if limited
-     * @return self                  Current builder instance
+     * @param  string $key         Identifier for rate limit grouping
+     * @param  bool   $serve_stale Whether to return stale data if limited
+     * @return self   Current builder instance
      */
-    public function withRateLimit(string $key, bool $serve_stale = true) : self
+    public function withRateLimit(string $key, bool $serve_stale = true): self
     {
         $this->rate_limit_key = $key;
         $this->serve_stale_if_limited = $serve_stale;
-        return $this;
-    }
 
-     /**
-      * Sets cache invalidation tags
-      *
-      * @param  string[]  $tags  List of tags
-      * @return self             Current builder instance
-      */
-    public function withTags(array $tags) : self
-    {
-        $this->tags = $tags;
         return $this;
     }
 
     /**
-     * Finalizes and builds the CacheOptions object
+     * Sets cache invalidation tags.
+     *
+     * @param  string[] $tags List of tags
+     * @return self     Current builder instance
+     */
+    public function withTags(array $tags): self
+    {
+        $this->tags = $tags;
+
+        return $this;
+    }
+
+    /**
+     * Finalizes and builds the CacheOptions object.
      *
      * @return CacheOptions Configured options instance
      */
-    public function build() : CacheOptions
+    public function build(): CacheOptions
     {
         return new CacheOptions(
             ttl: $this->ttl,

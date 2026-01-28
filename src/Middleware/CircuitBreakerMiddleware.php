@@ -30,27 +30,29 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
 use React\Promise\PromiseInterface;
+use Symfony\Component\Lock\LockFactory;
 
 /**
- * Middleware that prevents cascading failures by stopping requests to failing services
+ * Middleware that prevents cascading failures by stopping requests to failing services.
  */
 class CircuitBreakerMiddleware implements MiddlewareInterface
 {
     private const STATE_CLOSED = 'closed';
     private const STATE_OPEN = 'open';
-    private const STATE_HALF_OPEN = 'half_open';
 
     private LoggerInterface $logger;
 
     /**
-     * @param  CacheInterface        $storage            Storage for breaker state and failure counts
-     * @param  int                   $failure_threshold  Number of failures before opening the circuit
-     * @param  int                   $retry_timeout      Timeout in seconds before moving to half-open state
-     * @param  string                $prefix             Cache key prefix for breaker state
-     * @param  LoggerInterface|null  $logger             Logger for state changes
+     * @param CacheInterface       $storage           Storage for breaker state and failure counts
+     * @param LockFactory          $lock_factory      Symfony Lock Factory for half-open probes
+     * @param int                  $failure_threshold Number of failures before opening the circuit
+     * @param int                  $retry_timeout     Timeout in seconds before moving to half-open state
+     * @param string               $prefix            Cache key prefix for breaker state
+     * @param LoggerInterface|null $logger            Logger for state changes
      */
     public function __construct(
         private CacheInterface $storage,
+        private LockFactory $lock_factory,
         private int $failure_threshold = 5,
         private int $retry_timeout = 60,
         private string $prefix = 'cb:',
@@ -60,78 +62,90 @@ class CircuitBreakerMiddleware implements MiddlewareInterface
     }
 
     /**
-     * Monitors service health and prevents requests during failure states
+     * Orchestrates circuit state transitions and request blocking.
      *
-     * @param  CacheContext  $context  The resolution state
-     * @param  callable      $next     Next handler in the chain
-     * @return PromiseInterface        Promise result or immediate rejection
+     * @template T
+     *
+     * @param  callable(CacheContext):PromiseInterface<T> $next Next handler in the chain
+     * @return PromiseInterface<T>                        Result promise
      */
-    public function handle(CacheContext $context, callable $next) : PromiseInterface
+    public function handle(CacheContext $context, callable $next): PromiseInterface
     {
-        $state_key = $this->prefix . $context->key . ':state';
-        $failure_key = $this->prefix . $context->key . ':failures';
+        $lock_key = $this->prefix . 'lock:' . $context->key;
+        $state_key = $this->prefix . 'state:' . $context->key;
+        $failure_key = $this->prefix . 'fail:' . $context->key;
+        $last_fail_key = $this->prefix . 'last_fail:' . $context->key;
 
-        $state = $this->storage->get($state_key, self::STATE_CLOSED);
+        /** @var mixed $raw_failure_time */
+        $raw_failure_time = $this->storage->get($last_fail_key, 0);
+        $last_failure_time = is_numeric($raw_failure_time) ? (int) $raw_failure_time : 0;
 
-        if ($state === self::STATE_OPEN) {
-            $val = $this->storage->get($this->prefix . $context->key . ':last_failure', 0);
-            $last_failure_time = is_numeric($val) ? (int) $val : 0;
-
+        if ($last_failure_time > 0) {
+            // Half-open check: allow a single probe request after timeout
             if (time() - $last_failure_time < $this->retry_timeout) {
                 $this->logger->error('AsyncCache CIRCUIT_BREAKER: Open state, blocking request', ['key' => $context->key]);
-                return \React\Promise\reject(new \RuntimeException("Circuit Breaker is OPEN for key: {$context->key}"));
+                /** @var PromiseInterface<never> $reject */
+                $reject = \React\Promise\reject(new \RuntimeException("Circuit Breaker is OPEN for key: {$context->key}"));
+
+                return $reject;
             }
 
-            // Timeout passed, move to half-open
-            $state = self::STATE_HALF_OPEN;
-            $this->storage->set($state_key, self::STATE_HALF_OPEN);
-            $this->logger->warning('AsyncCache CIRCUIT_BREAKER: Half-open state, attempting probe request', ['key' => $context->key]);
+            // Half-open: try to acquire a probe lock
+            $lock = $this->lock_factory->createLock($lock_key, 30.0);
+            if (! $lock->acquire(false)) {
+                $this->logger->debug('AsyncCache CIRCUIT_BREAKER: Half-open, but probe already in progress', ['key' => $context->key]);
+                /** @var PromiseInterface<never> $reject */
+                $reject = \React\Promise\reject(new \RuntimeException("Circuit Breaker is HALF-OPEN for key: {$context->key} (Probe in progress)"));
+
+                return $reject;
+            }
+
+            $this->logger->info('AsyncCache CIRCUIT_BREAKER: Half-open, allowing probe request', ['key' => $context->key]);
         }
 
-        return $next($context)->then(
-            function ($data) use ($state_key, $failure_key, $context) {
-                $this->onSuccess($state_key, $failure_key, $context->key);
+        /** @var PromiseInterface<T> $promise */
+        $promise = $next($context);
+
+        /** @var PromiseInterface<T> $result */
+        $result = $promise->then(
+            function ($data) use ($state_key, $failure_key, $last_fail_key, $context) {
+                $this->onSuccess($state_key, $failure_key, $last_fail_key, $context->key);
+
                 return $data;
             },
-            function ($reason) use ($state_key, $failure_key, $context) {
-                $this->onFailure($state_key, $failure_key, $context->key);
+            function (\Throwable $reason) use ($state_key, $failure_key, $last_fail_key, $context) {
+                $this->onFailure($state_key, $failure_key, $last_fail_key, $context->key);
                 throw $reason;
             }
         );
+
+        return $result;
     }
 
     /**
-     * Handles successful request completion
-     * 
-     * @param  string  $state_key    Storage key for state
-     * @param  string  $failure_key  Storage key for failure count
-     * @param  string  $key          Resource identifier
-     * @return void
+     * Handles successful request completion.
      */
-    private function onSuccess(string $state_key, string $failure_key, string $key) : void
+    private function onSuccess(string $state_key, string $failure_key, string $last_fail_key, string $key): void
     {
         $this->storage->set($state_key, self::STATE_CLOSED);
         $this->storage->set($failure_key, 0);
+        $this->storage->delete($last_fail_key);
         $this->logger->info('AsyncCache CIRCUIT_BREAKER: Success, circuit closed', ['key' => $key]);
     }
 
     /**
-     * Handles request failure
-     * 
-     * @param  string  $state_key    Storage key for state
-     * @param  string  $failure_key  Storage key for failure count
-     * @param  string  $key          Resource identifier
-     * @return void
+     * Handles request failure.
      */
-    private function onFailure(string $state_key, string $failure_key, string $key) : void
+    private function onFailure(string $state_key, string $failure_key, string $last_fail_key, string $key): void
     {
+        /** @var mixed $val */
         $val = $this->storage->get($failure_key, 0);
         $failures = (is_numeric($val) ? (int) $val : 0) + 1;
         $this->storage->set($failure_key, $failures);
 
         if ($failures >= $this->failure_threshold) {
             $this->storage->set($state_key, self::STATE_OPEN);
-            $this->storage->set($this->prefix . $key . ':last_failure', time());
+            $this->storage->set($last_fail_key, time());
             $this->logger->critical('AsyncCache CIRCUIT_BREAKER: Failure threshold reached, opening circuit', [
                 'key' => $key,
                 'failures' => $failures

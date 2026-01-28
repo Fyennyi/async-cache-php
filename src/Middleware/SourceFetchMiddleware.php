@@ -35,7 +35,7 @@ use Psr\Log\LoggerInterface;
 use React\Promise\PromiseInterface;
 
 /**
- * Final middleware in the chain that executes the actual data-fetching factory
+ * Final middleware in the chain that executes the actual data-fetching factory.
  */
 class SourceFetchMiddleware implements MiddlewareInterface
 {
@@ -47,9 +47,13 @@ class SourceFetchMiddleware implements MiddlewareInterface
     }
 
     /**
+     * @template T
      * @inheritDoc
+     *
+     * @param  callable(CacheContext):PromiseInterface<T> $next
+     * @return PromiseInterface<T>
      */
-    public function handle(CacheContext $context, callable $next) : PromiseInterface
+    public function handle(CacheContext $context, callable $next): PromiseInterface
     {
         $this->logger->debug('AsyncCache MISS: fetching from source', ['key' => $context->key]);
         $this->dispatcher?->dispatch(new CacheMissEvent($context->key));
@@ -57,7 +61,9 @@ class SourceFetchMiddleware implements MiddlewareInterface
         $start = microtime(true);
 
         try {
-            $promise = $next($context)->then(
+            /** @var PromiseInterface<T> $promise */
+            $promise = $next($context);
+            $promise->then(
                 function ($data) use ($context, $start) {
                     $generation_time = microtime(true) - $start;
                     $this->dispatcher?->dispatch(new CacheStatusEvent(
@@ -68,7 +74,7 @@ class SourceFetchMiddleware implements MiddlewareInterface
                     ));
 
                     // Background persistence - handle errors to avoid breaking the response
-                    $this->storage->set($context->key, $data, $context->options, $generation_time)->catch(function(\Throwable $e) use ($context) {
+                    $this->storage->set($context->key, $data, $context->options, $generation_time)->catch(function (\Throwable $e) use ($context) {
                         $this->logger->error('AsyncCache PERSISTENCE_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
                     });
 
@@ -80,7 +86,7 @@ class SourceFetchMiddleware implements MiddlewareInterface
             );
 
             // Catch for the branch created by then() to avoid unhandled rejection logging
-            $promise->catch(function(\Throwable $e) use ($context) {
+            $promise->catch(function (\Throwable $e) use ($context) {
                 $this->logger->debug('AsyncCache FETCH_PIPELINE_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
             });
 

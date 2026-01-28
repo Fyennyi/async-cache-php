@@ -32,17 +32,17 @@ use React\Promise\PromiseInterface;
 use function React\Promise\Timer\resolve as delay;
 
 /**
- * Middleware that retries failed requests with exponential backoff
+ * Middleware that retries failed requests with exponential backoff.
  */
 class RetryMiddleware implements MiddlewareInterface
 {
     private LoggerInterface $logger;
 
     /**
-     * @param  int                   $max_retries       Maximum number of retry attempts
-     * @param  int                   $initial_delay_ms  Delay before the first retry in milliseconds
-     * @param  float                 $multiplier        Multiplier for exponential backoff
-     * @param  LoggerInterface|null  $logger            Logger for reporting retries
+     * @param int                  $max_retries      Maximum number of retry attempts
+     * @param int                  $initial_delay_ms Delay before the first retry in milliseconds
+     * @param float                $multiplier       Multiplier for exponential backoff
+     * @param LoggerInterface|null $logger           Logger for reporting retries
      */
     public function __construct(
         private int $max_retries = 3,
@@ -54,28 +54,35 @@ class RetryMiddleware implements MiddlewareInterface
     }
 
     /**
-     * Handles the request with automatic retry logic
+     * Handles the request with automatic retry logic.
      *
-     * @param  CacheContext  $context  The resolution state
-     * @param  callable      $next     Next handler in the chain
-     * @return PromiseInterface        Promise result
+     * @template T
+     *
+     * @param  CacheContext                               $context The resolution state
+     * @param  callable(CacheContext):PromiseInterface<T> $next    Next handler in the chain
+     * @return PromiseInterface<T>                        Promise result
      */
-    public function handle(CacheContext $context, callable $next) : PromiseInterface
+    public function handle(CacheContext $context, callable $next): PromiseInterface
     {
         return $this->attempt($context, $next, 0);
     }
 
     /**
-     * Recursively attempt the request with backoff
+     * Recursively attempt the request with backoff.
      *
-     * @param  CacheContext  $context  The resolution state
-     * @param  callable      $next     Next handler in the chain
-     * @param  int           $retries  Current retry attempt counter
-     * @return PromiseInterface        Result of the attempt
+     * @template T
+     *
+     * @param  CacheContext                               $context The resolution state
+     * @param  callable(CacheContext):PromiseInterface<T> $next    Next handler in the chain
+     * @param  int                                        $retries Current retry attempt counter
+     * @return PromiseInterface<T>                        Result of the attempt
      */
-    private function attempt(CacheContext $context, callable $next, int $retries) : PromiseInterface
+    private function attempt(CacheContext $context, callable $next, int $retries): PromiseInterface
     {
-        return $next($context)->catch(
+        /** @var PromiseInterface<T> $promise */
+        $promise = $next($context);
+
+        return $promise->catch(
             function ($reason) use ($context, $next, $retries) {
                 if ($retries >= $this->max_retries) {
                     $this->logger->error('AsyncCache RETRY: Max retries reached', [
@@ -97,8 +104,8 @@ class RetryMiddleware implements MiddlewareInterface
 
                 // Non-blocking wait then retry
                 return delay($delay_ms / 1000)->then(
-                    fn() => $this->attempt($context, $next, $retries + 1)
-                )->catch(function(\Throwable $e) use ($context) {
+                    fn () => $this->attempt($context, $next, $retries + 1)
+                )->catch(function (\Throwable $e) use ($context) {
                     $this->logger->error('AsyncCache RETRY_DELAY_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
                     throw $e;
                 });

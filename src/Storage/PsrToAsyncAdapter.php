@@ -1,13 +1,13 @@
 <?php
 
 /*
- * 
+ *
  *     _                          ____           _            ____  _   _ ____
  *    / \   ___ _   _ _ __   ___ / ___|__ _  ___| |__   ___  |  _ \| | | |  _ \
  *   / _ \ / __| | | | '_ \ / __| |   / _` |/ __| '_ \ / _ \ | |_) | |_| | |_) |
- *  / ___ \\__ \ |_| | | | | (__| |__| (_| | (__| | | |  __/ |  __/|  _  |  __/ 
- * /_/   \_\___/\__, |_| |_|\___|\____\__,_|\___|_| |_|\___| |_|   |_| |_|_| 
- *              |___/ 
+ *  / ___ \\__ \ |_| | | | | (__| |__| (_| | (__| | | |  __/ |  __/|  _  |  __/
+ * /_/   \_\___/\__, |_| |_|\___|\____\__,_|\___|_| |_|\___| |_|   |_| |_|_|
+ *              |___/
  *
  * This program is free software: you can redistribute and/or modify
  * it under the terms of the CSSM Unlimited License v2.0.
@@ -29,19 +29,23 @@ use Psr\SimpleCache\CacheInterface as PsrCacheInterface;
 use React\Promise\PromiseInterface;
 
 /**
- * Wraps a synchronous PSR-16 cache to act as an asynchronous adapter
+ * Wraps a synchronous PSR-16 cache to act as an asynchronous adapter.
  */
 class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
 {
     /**
-     * @param  PsrCacheInterface  $psr_cache  The synchronous PSR-16 cache
+     * @param PsrCacheInterface $psr_cache The synchronous PSR-16 cache
      */
-    public function __construct(private PsrCacheInterface $psr_cache) {}
+    public function __construct(private PsrCacheInterface $psr_cache)
+    {
+    }
 
     /**
      * @inheritDoc
+     *
+     * @return PromiseInterface<mixed>
      */
-    public function get(string $key) : PromiseInterface
+    public function get(string $key): PromiseInterface
     {
         try {
             return \React\Promise\resolve($this->psr_cache->get($key));
@@ -53,9 +57,9 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
     /**
      * @inheritDoc
      *
-     * @param  iterable<string>  $keys  A list of cache keys to retrieve from the synchronous storage
+     * @return PromiseInterface<iterable<string,  mixed>>
      */
-    public function getMultiple(iterable $keys) : PromiseInterface
+    public function getMultiple(iterable $keys): PromiseInterface
     {
         try {
             return \React\Promise\resolve($this->psr_cache->getMultiple($keys));
@@ -66,8 +70,10 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
 
     /**
      * @inheritDoc
+     *
+     * @return PromiseInterface<bool>
      */
-    public function set(string $key, mixed $value, ?int $ttl = null) : PromiseInterface
+    public function set(string $key, mixed $value, ?int $ttl = null): PromiseInterface
     {
         try {
             return \React\Promise\resolve($this->psr_cache->set($key, $value, $ttl));
@@ -78,8 +84,10 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
 
     /**
      * @inheritDoc
+     *
+     * @return PromiseInterface<bool>
      */
-    public function delete(string $key) : PromiseInterface
+    public function delete(string $key): PromiseInterface
     {
         try {
             return \React\Promise\resolve($this->psr_cache->delete($key));
@@ -90,8 +98,10 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
 
     /**
      * @inheritDoc
+     *
+     * @return PromiseInterface<bool>
      */
-    public function clear() : PromiseInterface
+    public function clear(): PromiseInterface
     {
         try {
             return \React\Promise\resolve($this->psr_cache->clear());

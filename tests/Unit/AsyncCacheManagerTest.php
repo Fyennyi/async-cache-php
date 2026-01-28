@@ -10,10 +10,9 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
-use Symfony\Component\RateLimiter\LimiterInterface;
 use Symfony\Component\Lock\LockFactory;
-use Symfony\Component\Lock\LockInterface;
 use Symfony\Component\Lock\Store\InMemoryStore;
+use Symfony\Component\RateLimiter\LimiterInterface;
 
 class AsyncCacheManagerTest extends TestCase
 {
@@ -22,7 +21,7 @@ class AsyncCacheManagerTest extends TestCase
     private LockFactory $lockFactory;
     private AsyncCacheManager $manager;
 
-    protected function setUp() : void
+    protected function setUp(): void
     {
         $this->cache = $this->createMock(CacheInterface::class);
         $this->rateLimiter = $this->createMock(LimiterInterface::class);
@@ -36,33 +35,33 @@ class AsyncCacheManagerTest extends TestCase
         );
     }
 
-    public function testReturnsFreshCacheImmediately() : void
+    public function testReturnsFreshCacheImmediately(): void
     {
         $key = 'test_key';
         $data = 'cached_data';
         $options = new CacheOptions(ttl: 60);
 
         // Mock cache hit via PSR adapter (CacheStorage calls adapter->get)
-        // Note: CacheStorage wraps result in CachedItem. 
+        // Note: CacheStorage wraps result in CachedItem.
         // Since we mock PSR cache, PsrToAsyncAdapter returns whatever PSR returns.
         // CacheStorage expects either CachedItem object or array ['d' => ..., 'e' => ...].
-        
+
         $cachedItem = new CachedItem($data, time() + 100);
         // We simulate that the underlying cache returns a serialized version or object depending on adapter.
         // PsrToAsyncAdapter just passes value through.
-        
+
         $this->cache->expects($this->once())
             ->method('get')
             ->with($key)
             ->willReturn($cachedItem);
 
-        $future = $this->manager->wrap($key, fn() => 'new_data', $options);
+        $future = $this->manager->wrap($key, fn () => 'new_data', $options);
         $result = $future->wait();
 
         $this->assertSame($data, $result);
     }
 
-    public function testFetchesNewDataOnCacheMiss() : void
+    public function testFetchesNewDataOnCacheMiss(): void
     {
         $key = 'test_key';
         $newData = 'new_data';
@@ -74,13 +73,13 @@ class AsyncCacheManagerTest extends TestCase
         // 2. Cache set (after fetch)
         $this->cache->expects($this->once())->method('set');
 
-        $future = $this->manager->wrap($key, fn() => $newData, $options);
+        $future = $this->manager->wrap($key, fn () => $newData, $options);
         $result = $future->wait();
 
         $this->assertSame($newData, $result);
     }
 
-    public function testForceRefreshStrategy() : void
+    public function testForceRefreshStrategy(): void
     {
         $key = 'test_key';
         $newData = 'fresh_data';
@@ -89,23 +88,23 @@ class AsyncCacheManagerTest extends TestCase
         // Should NOT check cache for get (strategy bypasses lookup)
         // But might check for lock/etc. Actually CacheLookupMiddleware handles ForceRefresh by calling next() immediately.
         // So adapter->get should NOT be called by CacheLookupMiddleware.
-        
+
         // Wait, CacheLookupMiddleware does: if (ForceRefresh) return next($context).
         // So get() is skipped.
-        
+
         // Then SourceFetchMiddleware calls factory and sets cache.
         $this->cache->expects($this->once())->method('set');
-        
+
         // Ensure get is never called (except maybe by other middlewares? No)
         $this->cache->expects($this->never())->method('get');
 
-        $future = $this->manager->wrap($key, fn() => $newData, $options);
+        $future = $this->manager->wrap($key, fn () => $newData, $options);
         $result = $future->wait();
 
         $this->assertSame($newData, $result);
     }
 
-    public function testClearsCache() : void
+    public function testClearsCache(): void
     {
         $this->cache->expects($this->once())
             ->method('clear')
@@ -113,12 +112,12 @@ class AsyncCacheManagerTest extends TestCase
 
         $future = $this->manager->clear();
         $result = $future->wait();
-        
+
         // The adapter result (true) is returned
         $this->assertTrue($result);
     }
 
-    public function testDeletesCacheKey() : void
+    public function testDeletesCacheKey(): void
     {
         $key = 'test_key';
 

@@ -34,15 +34,15 @@ use Psr\Log\NullLogger;
 use React\Promise\PromiseInterface;
 
 /**
- * High-availability middleware that catches exceptions and serves stale data
+ * High-availability middleware that catches exceptions and serves stale data.
  */
 class StaleOnErrorMiddleware implements MiddlewareInterface
 {
     private LoggerInterface $logger;
 
     /**
-     * @param  LoggerInterface|null           $logger      Logger for reporting failures
-     * @param  EventDispatcherInterface|null  $dispatcher  Dispatcher for telemetry events
+     * @param LoggerInterface|null          $logger     Logger for reporting failures
+     * @param EventDispatcherInterface|null $dispatcher Dispatcher for telemetry events
      */
     public function __construct(
         ?LoggerInterface $logger = null,
@@ -52,19 +52,23 @@ class StaleOnErrorMiddleware implements MiddlewareInterface
     }
 
     /**
-     * Catches errors and returns stale data if available
+     * Catches errors and returns stale data if available.
      *
-     * @param  CacheContext  $context  The resolution state
-     * @param  callable      $next     Next handler in the chain
-     * @return PromiseInterface        Promise resolving to fresh or stale data
+     * @template T
+     *
+     * @param  callable(CacheContext):PromiseInterface<T> $next Next handler in the chain
+     * @return PromiseInterface<T>                        Promise resolving to fresh or stale data
      */
-    public function handle(CacheContext $context, callable $next) : PromiseInterface
+    public function handle(CacheContext $context, callable $next): PromiseInterface
     {
-        return $next($context)->catch(
-            function ($reason) use ($context) {
-                $msg = $reason instanceof \Throwable ? $reason->getMessage() : (\is_scalar($reason) || $reason instanceof \Stringable ? (string)$reason : 'Unknown error');
+        /** @var PromiseInterface<T> $promise */
+        $promise = $next($context);
 
-                if ($context->stale_item !== null) {
+        return $promise->catch(
+            function (\Throwable $reason) use ($context) {
+                $msg = $reason->getMessage();
+
+                if (null !== $context->stale_item) {
                     $this->logger->warning('AsyncCache STALE_ON_ERROR: fetch failed, serving stale data', [
                         'key' => $context->key,
                         'reason' => $msg
@@ -77,10 +81,13 @@ class StaleOnErrorMiddleware implements MiddlewareInterface
                         $context->options->tags
                     ));
 
-                    return $context->stale_item->data;
+                    /** @var T $stale_data */
+                    $stale_data = $context->stale_item->data;
+
+                    return $stale_data;
                 }
 
-                throw ($reason instanceof \Throwable ? $reason : new \RuntimeException($msg));
+                throw $reason;
             }
         );
     }

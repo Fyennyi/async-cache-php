@@ -26,7 +26,7 @@
 namespace Fyennyi\AsyncCache\Enum;
 
 /**
- * Internal cache operation status
+ * Internal cache operation status.
  */
 enum CacheStatus: string
 {

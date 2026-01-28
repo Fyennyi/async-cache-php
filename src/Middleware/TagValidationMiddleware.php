@@ -6,8 +6,8 @@
  *    / \   ___ _   _ _ __   ___ / ___|__ _  ___| |__   ___  |  _ \| | | |  _ \
  *   / _ \ / __| | | | '_ \ / __| |   / _` |/ __| '_ \ / _ \ | |_) | |_| | |_) |
  *  / ___ \\__ \ |_| | | | | (__| |__| (_| | (__| | | |  __/ |  __/|  _  |  __/
- * /_/   \_\___/\__, |_| |_|\___|\____\__,_|\___|_| |_|\___| |_|   |_| |_|_| 
- *              |___/ 
+ * /_/   \_\___/\__, |_| |_|\___|\____\__,_|\___|_| |_|\___| |_|   |_| |_|_|
+ *              |___/
  *
  * This program is free software: you can redistribute and/or modify
  * it under the terms of the CSSM Unlimited License v2.0.
@@ -32,13 +32,13 @@ use Psr\Log\LoggerInterface;
 use React\Promise\PromiseInterface;
 
 /**
- * Middleware responsible for validating tag versions of cached items
+ * Middleware responsible for validating tag versions of cached items.
  */
 class TagValidationMiddleware implements MiddlewareInterface
 {
     /**
-     * @param  CacheStorage     $storage  The storage orchestrator to fetch tag versions
-     * @param  LoggerInterface  $logger   Logging implementation for debug info
+     * @param CacheStorage    $storage The storage orchestrator to fetch tag versions
+     * @param LoggerInterface $logger  Logging implementation for debug info
      */
     public function __construct(
         private CacheStorage $storage,
@@ -47,13 +47,14 @@ class TagValidationMiddleware implements MiddlewareInterface
     }
 
     /**
+     * @template T
      * @inheritDoc
      *
-     * @param  CacheContext                             $context  The current request context
-     * @param  callable(CacheContext):PromiseInterface  $next     The next middleware in the chain
-     * @return PromiseInterface                                   A promise representing the eventual result
+     * @param  CacheContext                               $context The current request context
+     * @param  callable(CacheContext):PromiseInterface<T> $next    The next middleware in the chain
+     * @return PromiseInterface<T>                        A promise representing the eventual result
      */
-    public function handle(CacheContext $context, callable $next) : PromiseInterface
+    public function handle(CacheContext $context, callable $next): PromiseInterface
     {
         $item = $context->stale_item;
 
@@ -63,23 +64,30 @@ class TagValidationMiddleware implements MiddlewareInterface
 
         $tags = array_map('strval', array_keys($item->tag_versions));
 
-        // Use the internal getTagVersions from storage (it remains there as a helper for fetching versions)
-        // We will make it public or use a wrapper in storage
-        return $this->storage->fetchTagVersions($tags)->then(function ($current_versions) use ($context, $item, $next) {
-            foreach ($item->tag_versions as $tag => $saved_version) {
+        /** @var PromiseInterface<array<string, string>> $versions_promise */
+        $versions_promise = $this->storage->fetchTagVersions($tags);
+
+        return $versions_promise->then(function (array $current_versions) use ($context, $item, $next) {
+            /** @var array<string, string> $tag_versions */
+            $tag_versions = $item->tag_versions;
+            foreach ($tag_versions as $tag => $saved_version) {
                 if (($current_versions[$tag] ?? null) !== $saved_version) {
                     $this->logger->debug('AsyncCache TAG_INVALID: Version mismatch for tag {tag} in key {key}', [
                         'key' => $context->key,
                         'tag' => $tag
                     ]);
                     $context->stale_item = null;
+
                     return $next($context);
                 }
             }
 
             // Tags are valid. If the item is fresh, we can return it now.
             if ($item->isFresh()) {
-                return \React\Promise\resolve($item->data);
+                /** @var T $item_data */
+                $item_data = $item->data;
+
+                return \React\Promise\resolve($item_data);
             }
 
             return $next($context);
@@ -87,6 +95,7 @@ class TagValidationMiddleware implements MiddlewareInterface
             $this->logger->error('AsyncCache TAG_FETCH_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
             // On tag fetch error, we conservatively treat as stale/invalid
             $context->stale_item = null;
+
             return $next($context);
         });
     }
