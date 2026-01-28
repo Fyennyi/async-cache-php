@@ -10,12 +10,32 @@ use PHPUnit\Framework\TestCase;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\InMemoryStore;
 use Symfony\Component\RateLimiter\LimiterInterface;
 
 class AsyncCacheBuilderTest extends TestCase
 {
+    public function testBuildsManagerWithClock() : void
+    {
+        $cache = $this->createMock(CacheInterface::class);
+        $clock = new MockClock();
+
+        $manager = AsyncCacheBuilder::create($cache)
+            ->withClock($clock)
+            ->build();
+
+        $this->assertInstanceOf(AsyncCacheManager::class, $manager);
+
+        // We can verify if clock was set by inspecting the private property using reflection
+        $ref = new \ReflectionClass($manager);
+        $prop = $ref->getProperty('clock');
+        $prop->setAccessible(true);
+
+        $this->assertSame($clock, $prop->getValue($manager));
+    }
+
     public function testBuildsManagerWithDefaults() : void
     {
         $cache = $this->createMock(CacheInterface::class);
