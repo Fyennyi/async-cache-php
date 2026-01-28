@@ -26,8 +26,6 @@
 namespace Fyennyi\AsyncCache\Middleware;
 
 use Fyennyi\AsyncCache\Core\CacheContext;
-use Fyennyi\AsyncCache\Core\Deferred;
-use Fyennyi\AsyncCache\Core\Future;
 use Fyennyi\AsyncCache\Enum\CacheStatus;
 use Fyennyi\AsyncCache\Enum\CacheStrategy;
 use Fyennyi\AsyncCache\Event\CacheHitEvent;
@@ -36,6 +34,7 @@ use Fyennyi\AsyncCache\Model\CachedItem;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
+use React\Promise\PromiseInterface;
 
 /**
  * Core middleware for initial cache retrieval and freshness validation
@@ -59,23 +58,19 @@ class CacheLookupMiddleware implements MiddlewareInterface
      *
      * @param  CacheContext  $context  The resolution state
      * @param  callable      $next     Next handler in the chain
-     * @return Future                  Future resolving to cached or fresh data
+     * @return PromiseInterface        Promise resolving to cached or fresh data
      */
-    public function handle(CacheContext $context, callable $next) : Future
+    public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
         // Basic tracing for debugging
         $this->logger->debug('CacheLookupMiddleware: handling cache context', ['key' => $context->key, 'strategy' => $context->options->strategy->value]);
         if ($context->options->strategy === CacheStrategy::ForceRefresh) {
             $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Bypass, 0, $context->options->tags));
-            /** @var Future $result */
-            $result = $next($context);
-            return $result;
+            return $next($context);
         }
 
-        $deferred = new Deferred();
-
-        $this->storage->get($context->key, $context->options)->onResolve(
-            function ($cached_item) use ($context, $next, $deferred) {
+        return $this->storage->get($context->key, $context->options)->then(
+            function ($cached_item) use ($context, $next) {
                 if ($cached_item instanceof CachedItem) {
                     $context->stale_item = $cached_item;
                     $is_fresh = $cached_item->isFresh();
@@ -94,8 +89,16 @@ class CacheLookupMiddleware implements MiddlewareInterface
                         $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, microtime(true) - $context->start_time, $context->options->tags));
                         $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $cached_item->data));
 
-                        $deferred->resolve($cached_item->data);
-                        return;
+                        // If item has tags, we MUST continue to TagValidationMiddleware
+                        if (! empty($cached_item->tag_versions)) {
+                            return $next($context)->then(function($res) use ($cached_item) {
+                                // If subsequent middleware (TagValidation) cleared the stale_item or returned a new result, use it
+                                // otherwise return the fresh data we found.
+                                return $res;
+                            });
+                        }
+
+                        return $cached_item->data;
                     }
 
                     if ($context->options->strategy === CacheStrategy::Background) {
@@ -103,21 +106,12 @@ class CacheLookupMiddleware implements MiddlewareInterface
                         $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $cached_item->data));
                         $next($context);
 
-                        $deferred->resolve($cached_item->data);
-                        return;
+                        return $cached_item->data;
                     }
                 }
 
-                /** @var Future $future */
-                $future = $next($context);
-                $future->onResolve(
-                    fn($v) => $deferred->resolve($v),
-                    fn($e) => $deferred->reject($e)
-                );
-            },
-            fn($e) => $deferred->reject($e)
+                return $next($context);
+            }
         );
-
-        return $deferred->future();
     }
 }

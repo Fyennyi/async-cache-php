@@ -25,29 +25,25 @@
 
 namespace Fyennyi\AsyncCache\Core;
 
+use React\Promise\PromiseInterface;
+
 /**
  * High-level timer for non-blocking asynchronous delays
  */
 class Timer
 {
     /**
-     * Creates a non-blocking delay that resolves into a Future
+     * Creates a non-blocking delay that resolves into a Promise
      *
-     * @param  float  $seconds  Seconds to wait
-     * @return Future           Future that resolves when time passes
+     * @param  float  $seconds  The number of seconds to wait before resolving the promise
+     * @return PromiseInterface A promise that resolves after the specified delay
      */
-    public static function delay(float $seconds) : Future
+    public static function delay(float $seconds) : PromiseInterface
     {
-        $deferred = new Deferred();
-
         if (function_exists('React\Promise\Timer\resolve')) {
-            \React\Promise\Timer\resolve($seconds)->then(fn() => $deferred->resolve(null));
-        } else {
-            // Fallback for extreme cases (should not happen in proper install)
-            usleep((int)($seconds * 1000000));
-            $deferred->resolve(null);
+            return \React\Promise\Timer\resolve($seconds);
         }
 
-        return $deferred->future();
+        throw new \RuntimeException("ReactPHP Timer is not available. Check your installation.");
     }
 }

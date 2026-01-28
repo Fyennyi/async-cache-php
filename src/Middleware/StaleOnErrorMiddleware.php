@@ -26,13 +26,12 @@
 namespace Fyennyi\AsyncCache\Middleware;
 
 use Fyennyi\AsyncCache\Core\CacheContext;
-use Fyennyi\AsyncCache\Core\Deferred;
-use Fyennyi\AsyncCache\Core\Future;
 use Fyennyi\AsyncCache\Enum\CacheStatus;
 use Fyennyi\AsyncCache\Event\CacheStatusEvent;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use React\Promise\PromiseInterface;
 
 /**
  * High-availability middleware that catches exceptions and serves stale data
@@ -57,19 +56,12 @@ class StaleOnErrorMiddleware implements MiddlewareInterface
      *
      * @param  CacheContext  $context  The resolution state
      * @param  callable      $next     Next handler in the chain
-     * @return Future                  Future resolving to fresh or stale data
+     * @return PromiseInterface        Promise resolving to fresh or stale data
      */
-    public function handle(CacheContext $context, callable $next) : Future
+    public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
-        $deferred = new Deferred();
-
-        /** @var Future $future */
-        $future = $next($context);
-        $future->onResolve(
-            function ($data) use ($deferred) {
-                $deferred->resolve($data);
-            },
-            function ($reason) use ($context, $deferred) {
+        return $next($context)->catch(
+            function ($reason) use ($context) {
                 $msg = $reason instanceof \Throwable ? $reason->getMessage() : (\is_scalar($reason) || $reason instanceof \Stringable ? (string)$reason : 'Unknown error');
 
                 if ($context->stale_item !== null) {
@@ -85,14 +77,11 @@ class StaleOnErrorMiddleware implements MiddlewareInterface
                         $context->options->tags
                     ));
 
-                    $deferred->resolve($context->stale_item->data);
-                    return;
+                    return $context->stale_item->data;
                 }
 
-                $deferred->reject($reason instanceof \Throwable ? $reason : new \RuntimeException($msg));
+                throw ($reason instanceof \Throwable ? $reason : new \RuntimeException($msg));
             }
         );
-
-        return $deferred->future();
     }
 }

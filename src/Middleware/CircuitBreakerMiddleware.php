@@ -26,11 +26,11 @@
 namespace Fyennyi\AsyncCache\Middleware;
 
 use Fyennyi\AsyncCache\Core\CacheContext;
-use Fyennyi\AsyncCache\Core\Deferred;
-use Fyennyi\AsyncCache\Core\Future;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
+use React\Promise\PromiseInterface;
+use function React\Promise\reject;
 
 /**
  * Middleware that prevents cascading failures by stopping requests to failing services
@@ -65,9 +65,9 @@ class CircuitBreakerMiddleware implements MiddlewareInterface
      *
      * @param  CacheContext  $context  The resolution state
      * @param  callable      $next     Next handler in the chain
-     * @return Future                  Future result or immediate rejection
+     * @return PromiseInterface        Promise result or immediate rejection
      */
-    public function handle(CacheContext $context, callable $next) : Future
+    public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
         $state_key = $this->prefix . $context->key . ':state';
         $failure_key = $this->prefix . $context->key . ':failures';
@@ -80,10 +80,7 @@ class CircuitBreakerMiddleware implements MiddlewareInterface
 
             if (time() - $last_failure_time < $this->retry_timeout) {
                 $this->logger->error('AsyncCache CIRCUIT_BREAKER: Open state, blocking request', ['key' => $context->key]);
-
-                $deferred = new Deferred();
-                $deferred->reject(new \RuntimeException("Circuit Breaker is OPEN for key: {$context->key}"));
-                return $deferred->future();
+                return reject(new \RuntimeException("Circuit Breaker is OPEN for key: {$context->key}"));
             }
 
             // Timeout passed, move to half-open
@@ -92,22 +89,16 @@ class CircuitBreakerMiddleware implements MiddlewareInterface
             $this->logger->warning('AsyncCache CIRCUIT_BREAKER: Half-open state, attempting probe request', ['key' => $context->key]);
         }
 
-        $deferred = new Deferred();
-
-        /** @var Future $future */
-        $future = $next($context);
-        $future->onResolve(
-            function ($data) use ($state_key, $failure_key, $context, $deferred) {
+        return $next($context)->then(
+            function ($data) use ($state_key, $failure_key, $context) {
                 $this->onSuccess($state_key, $failure_key, $context->key);
-                $deferred->resolve($data);
+                return $data;
             },
-            function ($reason) use ($state_key, $failure_key, $context, $deferred) {
+            function ($reason) use ($state_key, $failure_key, $context) {
                 $this->onFailure($state_key, $failure_key, $context->key);
-                $deferred->reject($reason);
+                throw $reason;
             }
         );
-
-        return $deferred->future();
     }
 
     /**

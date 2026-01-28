@@ -31,18 +31,18 @@ namespace Fyennyi\AsyncCache\Serializer;
 interface SerializerInterface
 {
     /**
-     * Transforms data into its string representation
+     * Converts raw data into a transportable string representation
      *
-     * @param  mixed  $data  Data to serialize
-     * @return string        Serialized representation
+     * @param  mixed  $data  The input data structure to serialize
+     * @return string        The serialized string representation
      */
     public function serialize(mixed $data) : string;
 
     /**
-     * Reconstructs original data from its serialized string
+     * Reconstructs the original data structure from its string representation
      *
-     * @param  string  $data  Serialized string
-     * @return mixed          Reconstructed original data
+     * @param  string  $data  The serialized string to process
+     * @return mixed          The original data structure reconstructed
      */
     public function unserialize(string $data) : mixed;
 }

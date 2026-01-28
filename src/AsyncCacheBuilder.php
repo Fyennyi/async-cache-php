@@ -51,8 +51,9 @@ class AsyncCacheBuilder
     /**
      * @param  PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface  $cache_adapter  The cache implementation
      */
-    public function __construct(private PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter)
-    {
+    public function __construct(
+        private PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter
+    ) {
     }
 
     /**
@@ -70,7 +71,7 @@ class AsyncCacheBuilder
      * Sets a custom Symfony Rate Limiter implementation
      *
      * @param  LimiterInterface  $rate_limiter  The implementation to use
-     * @return self                             Current builder instance
+     * @return self                             The current builder instance for chaining
      */
     public function withRateLimiter(LimiterInterface $rate_limiter) : self
     {
@@ -82,7 +83,7 @@ class AsyncCacheBuilder
      * Sets the PSR-3 logger
      *
      * @param  LoggerInterface  $logger  Logger implementation
-     * @return self                      Current builder instance
+     * @return self                      The current builder instance for chaining
      */
     public function withLogger(LoggerInterface $logger) : self
     {
@@ -94,7 +95,7 @@ class AsyncCacheBuilder
      * Configures the Symfony Lock Factory
      *
      * @param  LockFactory  $lock_factory  Lock factory instance
-     * @return self                        Current builder instance
+     * @return self                        The current builder instance for chaining
      */
     public function withLockFactory(LockFactory $lock_factory) : self
     {
@@ -106,7 +107,7 @@ class AsyncCacheBuilder
      * Appends a custom middleware to the pipeline
      *
      * @param  MiddlewareInterface  $middleware  Middleware implementation
-     * @return self                              Current builder instance
+     * @return self                              The current builder instance for chaining
      */
     public function withMiddleware(MiddlewareInterface $middleware) : self
     {
@@ -118,7 +119,7 @@ class AsyncCacheBuilder
      * Sets the PSR-14 event dispatcher
      *
      * @param  EventDispatcherInterface  $dispatcher  Dispatcher implementation
-     * @return self                                   Current builder instance
+     * @return self                                   The current builder instance for chaining
      */
     public function withEventDispatcher(EventDispatcherInterface $dispatcher) : self
     {
@@ -130,7 +131,7 @@ class AsyncCacheBuilder
      * Sets a custom serializer for data storage
      *
      * @param  SerializerInterface  $serializer  Serializer implementation
-     * @return self                              Current builder instance
+     * @return self                              The current builder instance for chaining
      */
     public function withSerializer(SerializerInterface $serializer) : self
     {
@@ -141,7 +142,7 @@ class AsyncCacheBuilder
     /**
      * Finalizes the configuration and creates the AsyncCacheManager
      *
-     * @return AsyncCacheManager Fully configured manager instance
+     * @return AsyncCacheManager A fully configured manager instance
      */
     public function build() : AsyncCacheManager
     {

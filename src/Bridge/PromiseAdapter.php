@@ -25,29 +25,28 @@
 
 namespace Fyennyi\AsyncCache\Bridge;
 
-use Fyennyi\AsyncCache\Core\Deferred;
-use Fyennyi\AsyncCache\Core\Future;
 use GuzzleHttp\Promise\Promise as GuzzlePromise;
 use GuzzleHttp\Promise\PromiseInterface as GuzzlePromiseInterface;
 use GuzzleHttp\Promise\Utils;
 use React\Promise\Deferred as ReactDeferred;
 use React\Promise\PromiseInterface as ReactPromiseInterface;
+use function React\Promise\resolve;
 
 /**
- * Converts internal Future placeholders to industry-standard Promise objects
+ * Converts between industry-standard Promise objects and ReactPHP promises
  */
 class PromiseAdapter
 {
     /**
-     * Converts a native Future to a Guzzle Promise
+     * Converts a ReactPHP Promise to a Guzzle Promise
      *
-     * @param  Future  $future  The library-native Future instance to be adapted
-     * @return GuzzlePromiseInterface A Guzzle Promise that completes when the Future is resolved or rejected
+     * @param  ReactPromiseInterface  $promise  The ReactPHP Promise instance to convert
+     * @return GuzzlePromiseInterface           A Guzzle Promise that reflects the state of the original promise
      */
-    public static function toGuzzle(Future $future) : GuzzlePromiseInterface
+    public static function toGuzzle(ReactPromiseInterface $promise) : GuzzlePromiseInterface
     {
         $guzzle = new GuzzlePromise();
-        $future->onResolve(
+        $promise->then(
             fn($v) => $guzzle->resolve($v),
             fn($r) => $guzzle->reject($r)
         );
@@ -55,44 +54,19 @@ class PromiseAdapter
     }
 
     /**
-     * Converts a native Future to a ReactPHP Promise
+     * Converts any promise type or raw value to a ReactPHP Promise
      *
-     * @param  Future  $future  The library-native Future instance to be adapted
-     * @return ReactPromiseInterface<mixed> A ReactPHP Promise that completes when the Future is resolved or rejected
+     * @param  mixed  $value  The value, ReactPHP promise, or Guzzle promise to convert
+     * @return ReactPromiseInterface A ReactPHP Promise tracking the resolution of the provided value
      */
-    public static function toReact(Future $future) : ReactPromiseInterface
+    public static function toPromise(mixed $value) : ReactPromiseInterface
     {
-        $deferred = new ReactDeferred();
-        $future->onResolve(
-            fn($v) => $deferred->resolve($v),
-            fn($r) => $deferred->reject($r instanceof \Throwable ? $r : new \RuntimeException(\is_scalar($r) || $r instanceof \Stringable ? (string)$r : 'Unknown error'))
-        );
-        return $deferred->promise();
-    }
-
-    /**
-     * Converts Futures, ReactPHP/Guzzle promises or raw values to a native Future
-     *
-     * @param  mixed  $value  The value or promise to convert
-     * @return Future         A Future tracking the resolution
-     */
-    public static function toFuture(mixed $value) : Future
-    {
-        if ($value instanceof Future) {
+        if ($value instanceof ReactPromiseInterface) {
             return $value;
         }
 
-        $deferred = new Deferred();
-
-        if ($value instanceof ReactPromiseInterface) {
-            $value->then(
-                fn($v) => $deferred->resolve($v),
-                fn($r) => $deferred->reject($r)
-            );
-            return $deferred->future();
-        }
-
         if ($value instanceof GuzzlePromiseInterface) {
+            $deferred = new ReactDeferred();
             $value->then(
                 fn($v) => $deferred->resolve($v),
                 fn($r) => $deferred->reject($r)
@@ -101,11 +75,10 @@ class PromiseAdapter
             // Ensure Guzzle's task queue is flushed
             Utils::queue()->run();
 
-            return $deferred->future();
+            return $deferred->promise();
         }
 
         // It's a raw value
-        $deferred->resolve($value);
-        return $deferred->future();
+        return resolve($value);
     }
 }

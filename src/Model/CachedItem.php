@@ -51,9 +51,9 @@ class CachedItem
     }
 
     /**
-     * Checks if the item is still logically fresh
+     * Checks if the item is still within its logical TTL
      *
-     * @return bool True if current time is before logical expiry
+     * @return bool True if fresh, false if stale
      */
     public function isFresh() : bool
     {

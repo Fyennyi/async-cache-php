@@ -39,13 +39,10 @@ class CacheContext
     /** @var float Microtime when the resolution started */
     public float $start_time;
 
-    /** @var Future|null The final result of the pipeline */
-    public ?Future $result_future = null;
-
     /**
-     * @param  string        $key              The cache key
-     * @param  mixed         $promise_factory  Callback to fetch fresh data
-     * @param  CacheOptions  $options          Resolved caching options
+     * @param  string        $key              The cache key identifier
+     * @param  mixed         $promise_factory  Callback to fetch fresh data from source
+     * @param  CacheOptions  $options          Resolved caching options for this request
      */
     public function __construct(
         public readonly string $key,

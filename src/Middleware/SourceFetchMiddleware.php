@@ -27,25 +27,19 @@ namespace Fyennyi\AsyncCache\Middleware;
 
 use Fyennyi\AsyncCache\Bridge\PromiseAdapter;
 use Fyennyi\AsyncCache\Core\CacheContext;
-use Fyennyi\AsyncCache\Core\Deferred;
-use Fyennyi\AsyncCache\Core\Future;
 use Fyennyi\AsyncCache\Enum\CacheStatus;
 use Fyennyi\AsyncCache\Event\CacheMissEvent;
 use Fyennyi\AsyncCache\Event\CacheStatusEvent;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
+use React\Promise\PromiseInterface;
 
 /**
- * The final middleware that calls the source and populates the cache asynchronously
+ * Final middleware in the chain that executes the actual data-fetching factory
  */
 class SourceFetchMiddleware implements MiddlewareInterface
 {
-    /**
-     * @param  CacheStorage                   $storage     The cache interaction layer
-     * @param  LoggerInterface                $logger      Logging implementation
-     * @param  EventDispatcherInterface|null  $dispatcher  Event dispatcher for telemetry
-     */
     public function __construct(
         private CacheStorage $storage,
         private LoggerInterface $logger,
@@ -54,55 +48,26 @@ class SourceFetchMiddleware implements MiddlewareInterface
     }
 
     /**
-     * Fetches fresh data from the source and updates cache asynchronously
-     *
-     * @param  CacheContext  $context  The resolution state
-     * @param  callable      $next     Next handler in the chain (usually empty destination)
-     * @return Future                  Future resolving to freshly fetched data
+     * @inheritDoc
      */
-    public function handle(CacheContext $context, callable $next) : Future
+    public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
+        $this->logger->debug('AsyncCache MISS: fetching from source', ['key' => $context->key]);
         $this->dispatcher?->dispatch(new CacheMissEvent($context->key));
 
-        $fetch_start_time = microtime(true);
-        $deferred = new Deferred();
+        $start = microtime(true);
+        $factory = $context->promise_factory;
 
-        try {
-            /** @var callable $factory */
-            $factory = $context->promise_factory;
-            $source_result = $factory();
-            $source_future = PromiseAdapter::toFuture($source_result);
-        } catch (\Throwable $e) {
-            $deferred->reject($e);
-            return $deferred->future();
-        }
+        return PromiseAdapter::toPromise($factory())->then(
+            function ($data) use ($context, $start) {
+                $generation_time = microtime(true) - $start;
+                $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Miss, microtime(true) - $context->start_time, $context->options->tags));
 
-        $source_future->onResolve(
-            function ($data) use ($context, $fetch_start_time, $deferred) {
-                $generation_time = microtime(true) - $fetch_start_time;
-
-                // Asynchronously populate the cache
+                // Background persistence
                 $this->storage->set($context->key, $data, $context->options, $generation_time);
 
-                $this->dispatcher?->dispatch(new CacheStatusEvent(
-                    $context->key,
-                    CacheStatus::Miss,
-                    microtime(true) - $context->start_time,
-                    $context->options->tags
-                ));
-
-                $deferred->resolve($data);
-            },
-            function ($reason) use ($context, $deferred) {
-                $msg = $reason instanceof \Throwable ? $reason->getMessage() : (\is_scalar($reason) || $reason instanceof \Stringable ? (string)$reason : 'Unknown error');
-                $this->logger->error('AsyncCache FETCH_ERROR', [
-                    'key' => $context->key,
-                    'reason' => $msg
-                ]);
-                $deferred->reject($reason instanceof \Throwable ? $reason : new \RuntimeException($msg));
+                return $data;
             }
         );
-
-        return $deferred->future();
     }
 }

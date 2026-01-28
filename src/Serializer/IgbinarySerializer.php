@@ -30,44 +30,35 @@ namespace Fyennyi\AsyncCache\Serializer;
  */
 class IgbinarySerializer implements SerializerInterface
 {
-    /** @var bool Whether igbinary extension is active */
-    private bool $supported;
-
+    /**
+     * @throws \RuntimeException If the igbinary extension is not loaded in the PHP environment
+     */
     public function __construct()
     {
-        $this->supported = extension_loaded('igbinary');
+        if (! extension_loaded('igbinary')) {
+            throw new \RuntimeException('igbinary extension is not loaded');
+        }
     }
 
     /**
-     * @param  mixed  $data  Data to serialize
-     * @return string
+     * @inheritDoc
+     *
+     * @param  mixed  $data  Data to be serialized using the igbinary binary format
+     * @return string        Serialized binary data string
      */
     public function serialize(mixed $data) : string
     {
-        if ($this->supported && function_exists('igbinary_serialize')) {
-            $result = igbinary_serialize($data);
-            if (is_string($result)) {
-                return $result;
-            }
-        }
-        // Fallback to PHP's built-in serializer for compatibility
-        $ser = serialize($data);
-        return (string) $ser;
+        return igbinary_serialize($data) ?: '';
     }
 
     /**
-     * @param  string  $data  Serialized string
-     * @return mixed
+     * @inheritDoc
+     *
+     * @param  string  $data  The binary-encoded string to be unserialized
+     * @return mixed          The original data structure
      */
     public function unserialize(string $data) : mixed
     {
-        if ($this->supported && function_exists('igbinary_unserialize')) {
-            $result = @igbinary_unserialize($data);
-            if ($result !== null || $data === '') {
-                return $result;
-            }
-        }
-        // Fallback to PHP's built-in unserializer for compatibility
-        return unserialize($data);
+        return igbinary_unserialize($data);
     }
 }

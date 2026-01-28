@@ -30,6 +30,9 @@ use Symfony\Component\Config\Definition\ConfigurationInterface;
 
 class Configuration implements ConfigurationInterface
 {
+    /**
+     * @return TreeBuilder The configuration tree builder
+     */
     public function getConfigTreeBuilder() : TreeBuilder
     {
         $treeBuilder = new TreeBuilder('async_cache');

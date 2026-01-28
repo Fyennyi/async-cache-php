@@ -27,8 +27,6 @@ namespace Fyennyi\AsyncCache\Bridge\Laravel;
 
 use Fyennyi\AsyncCache\AsyncCacheManager;
 use Illuminate\Support\ServiceProvider;
-use Psr\Log\LoggerInterface;
-use Psr\SimpleCache\CacheInterface;
 
 /**
  * Service Provider for Laravel integration
@@ -37,22 +35,25 @@ class AsyncCacheServiceProvider extends ServiceProvider
 {
     /**
      * Register services in the container
+     *
+     * @return void
      */
     public function register() : void
     {
         $this->mergeConfigFrom(__DIR__ . '/../../../config/async-cache.php', 'async-cache');
 
         $this->app->singleton(AsyncCacheManager::class, function ($app) {
-            // Laravel automatically provides implementations for CacheInterface and LoggerInterface
-            return new AsyncCacheManager(
-                cache_adapter: $app->make(CacheInterface::class),
-                logger: $app->make(LoggerInterface::class)
-            );
+            $config = $app['config']['async-cache'];
+            return AsyncCacheBuilder::create($app[$config['adapter']])
+                ->withLogger($app['log'])
+                ->build();
         });
     }
 
     /**
      * Bootstrap services
+     *
+     * @return void
      */
     public function boot() : void
     {

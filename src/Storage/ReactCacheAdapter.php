@@ -25,9 +25,9 @@
 
 namespace Fyennyi\AsyncCache\Storage;
 
-use Fyennyi\AsyncCache\Bridge\PromiseAdapter;
-use Fyennyi\AsyncCache\Core\Future;
 use React\Cache\CacheInterface as ReactCacheInterface;
+use function React\Promise\all;
+use React\Promise\PromiseInterface;
 
 /**
  * Adapter for reactphp/cache to be used within AsyncCache
@@ -42,17 +42,17 @@ class ReactCacheAdapter implements AsyncCacheAdapterInterface
     /**
      * @inheritDoc
      */
-    public function get(string $key) : Future
+    public function get(string $key) : PromiseInterface
     {
-        return PromiseAdapter::toFuture($this->react_cache->get($key));
+        return $this->react_cache->get($key);
     }
 
     /**
      * @inheritDoc
      *
-     * @param  iterable<string>  $keys
+     * @param  iterable<string>  $keys  A list of cache keys to retrieve in bulk
      */
-    public function getMultiple(iterable $keys) : Future
+    public function getMultiple(iterable $keys) : PromiseInterface
     {
         // ReactPHP cache doesn't have getMultiple, we simulate it
         $promises = [];
@@ -60,30 +60,30 @@ class ReactCacheAdapter implements AsyncCacheAdapterInterface
             $promises[$key] = $this->react_cache->get($key);
         }
 
-        return PromiseAdapter::toFuture(\React\Promise\all($promises));
+        return all($promises);
     }
 
     /**
      * @inheritDoc
      */
-    public function set(string $key, mixed $value, ?int $ttl = null) : Future
+    public function set(string $key, mixed $value, ?int $ttl = null) : PromiseInterface
     {
-        return PromiseAdapter::toFuture($this->react_cache->set($key, $value, $ttl));
+        return $this->react_cache->set($key, $value, $ttl);
     }
 
     /**
      * @inheritDoc
      */
-    public function delete(string $key) : Future
+    public function delete(string $key) : PromiseInterface
     {
-        return PromiseAdapter::toFuture($this->react_cache->delete($key));
+        return $this->react_cache->delete($key);
     }
 
     /**
      * @inheritDoc
      */
-    public function clear() : Future
+    public function clear() : PromiseInterface
     {
-        return PromiseAdapter::toFuture($this->react_cache->clear());
+        return $this->react_cache->clear();
     }
 }

@@ -32,6 +32,9 @@ use Symfony\Component\HttpKernel\Bundle\Bundle;
  */
 class AsyncCacheBundle extends Bundle
 {
+    /**
+     * @return \Symfony\Component\DependencyInjection\Extension\ExtensionInterface|null The bundle extension
+     */
     public function getContainerExtension() : ?\Symfony\Component\DependencyInjection\Extension\ExtensionInterface
     {
         return new DependencyInjection\AsyncCacheExtension();

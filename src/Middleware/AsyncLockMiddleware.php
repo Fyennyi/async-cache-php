@@ -26,8 +26,6 @@
 namespace Fyennyi\AsyncCache\Middleware;
 
 use Fyennyi\AsyncCache\Core\CacheContext;
-use Fyennyi\AsyncCache\Core\Deferred;
-use Fyennyi\AsyncCache\Core\Future;
 use Fyennyi\AsyncCache\Core\Timer;
 use Fyennyi\AsyncCache\Enum\CacheStatus;
 use Fyennyi\AsyncCache\Event\CacheHitEvent;
@@ -36,6 +34,9 @@ use Fyennyi\AsyncCache\Model\CachedItem;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
+use React\Promise\Deferred;
+use React\Promise\PromiseInterface;
+use function React\Promise\resolve;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\LockInterface;
 
@@ -66,9 +67,9 @@ class AsyncLockMiddleware implements MiddlewareInterface
      *
      * @param  CacheContext  $context  The resolution state
      * @param  callable      $next     Next handler in the chain
-     * @return Future                  Future resolving to fresh or stale data
+     * @return PromiseInterface        Promise resolving to fresh or stale data
      */
-    public function handle(CacheContext $context, callable $next) : Future
+    public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
         $lock_key = 'lock:' . $context->key;
         $lock = $this->lock_factory->createLock($lock_key, 30.0);
@@ -81,17 +82,13 @@ class AsyncLockMiddleware implements MiddlewareInterface
         if ($context->stale_item !== null) {
             $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, microtime(true) - $context->start_time, $context->options->tags));
             $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $context->stale_item->data));
-            $deferred = new Deferred();
-            $deferred->resolve($context->stale_item->data);
-            return $deferred->future();
+            return resolve($context->stale_item->data);
         }
 
         $this->logger->debug('AsyncCache LOCK_BUSY: waiting for lock asynchronously', ['key' => $context->key]);
 
         $start_time = microtime(true);
         $timeout = 10.0;
-
-        // Create a master deferred that will eventually hold the result of the successful attempt
         $master_deferred = new Deferred();
 
         $attempt = function () use (&$attempt, $context, $next, $lock_key, $start_time, $timeout, $master_deferred) {
@@ -100,7 +97,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
             if ($lock->acquire(false)) {
                 $this->active_locks[$lock_key] = $lock;
 
-                $this->storage->get($context->key, $context->options)->onResolve(
+                $this->storage->get($context->key, $context->options)->then(
                     function ($cached_item) use ($context, $next, $lock_key, $start_time, $master_deferred) {
                         if ($cached_item instanceof CachedItem && $cached_item->isFresh()) {
                             $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, microtime(true) - $start_time, $context->options->tags));
@@ -110,7 +107,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
                         }
 
                         // If acquired but no fresh cache, fetch via next middleware
-                        $this->handleWithLock($context, $next, $lock_key)->onResolve(
+                        $this->handleWithLock($context, $next, $lock_key)->then(
                             fn($v) => $master_deferred->resolve($v),
                             fn($e) => $master_deferred->reject($e)
                         );
@@ -129,14 +126,14 @@ class AsyncLockMiddleware implements MiddlewareInterface
             }
 
             // Retry after delay
-            Timer::delay(0.05)->onResolve(function() use ($attempt) {
+            Timer::delay(0.05)->then(function() use ($attempt) {
                 $attempt();
             });
         };
 
         $attempt();
 
-        return $master_deferred->future();
+        return $master_deferred->promise();
     }
 
     /**
@@ -145,27 +142,20 @@ class AsyncLockMiddleware implements MiddlewareInterface
      * @param  CacheContext  $context   The resolution state
      * @param  callable      $next      Next handler in the chain
      * @param  string        $lock_key  Key of the acquired lock
-     * @return Future                   Result future
+     * @return PromiseInterface         Result promise
      */
-    private function handleWithLock(CacheContext $context, callable $next, string $lock_key) : Future
+    private function handleWithLock(CacheContext $context, callable $next, string $lock_key) : PromiseInterface
     {
-        $deferred = new Deferred();
-
-        /** @var Future $future */
-        $future = $next($context);
-
-        $future->onResolve(
-            function ($data) use ($lock_key, $deferred) {
+        return $next($context)->then(
+            function ($data) use ($lock_key) {
                 $this->releaseLock($lock_key);
-                $deferred->resolve($data);
+                return $data;
             },
-            function ($reason) use ($lock_key, $deferred) {
+            function ($reason) use ($lock_key) {
                 $this->releaseLock($lock_key);
-                $deferred->reject($reason);
+                throw $reason;
             }
         );
-
-        return $deferred->future();
     }
 
     /**

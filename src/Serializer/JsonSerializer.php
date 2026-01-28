@@ -31,7 +31,7 @@ namespace Fyennyi\AsyncCache\Serializer;
 class JsonSerializer implements SerializerInterface
 {
     /**
-     * @param  int  $options  Bitmask of json_encode options
+     * @param  int  $options  Bitmask of json_encode options for tailoring JSON generation
      */
     public function __construct(
         private int $options = 0
@@ -39,20 +39,24 @@ class JsonSerializer implements SerializerInterface
     }
 
     /**
-     * @param  mixed  $data  Data to serialize
-     * @return string
+     * @inheritDoc
+     *
+     * @param  mixed  $data  Data to be encoded into JSON format
+     * @return string        The resulting JSON-encoded string
      */
     public function serialize(mixed $data) : string
     {
-        return json_encode($data, $this->options | JSON_THROW_ON_ERROR);
+        return json_encode($data, $this->options) ?: '';
     }
 
     /**
-     * @param  string  $data  Serialized JSON string
-     * @return mixed
+     * @inheritDoc
+     *
+     * @param  string  $data  The JSON-encoded string to decode
+     * @return mixed          The decoded data structure (array or scalar)
      */
     public function unserialize(string $data) : mixed
     {
-        return json_decode($data, true, 512, JSON_THROW_ON_ERROR);
+        return json_decode($data, true);
     }
 }

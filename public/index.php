@@ -24,7 +24,11 @@ class MemoryAdapter implements \Psr\SimpleCache\CacheInterface {
     public function set($key, $value, $ttl = null): bool { self::$data[$key] = $value; return true; }
     public function delete($key): bool { unset(self::$data[$key]); return true; }
     public function clear(): bool { self::$data = []; return true; }
-    public function getMultiple($keys, $default = null): iterable { return []; }
+    public function getMultiple($keys, $default = null): iterable {
+        $results = [];
+        foreach ($keys as $key) { $results[$key] = $this->get($key, $default); }
+        return $results;
+    }
     public function setMultiple($values, $ttl = null): bool { return true; }
     public function deleteMultiple($keys): bool { return true; }
     public function has($key): bool { return isset(self::$data[$key]); }
@@ -45,7 +49,11 @@ class SlowAdapter implements \Psr\SimpleCache\CacheInterface {
     }
     public function delete($key): bool { unset(self::$data[$key]); return true; }
     public function clear(): bool { self::$data = []; return true; }
-    public function getMultiple($keys, $default = null): iterable { return []; }
+    public function getMultiple($keys, $default = null): iterable {
+        $results = [];
+        foreach ($keys as $key) { $results[$key] = $this->get($key, $default); }
+        return $results;
+    }
     public function setMultiple($values, $ttl = null): bool { return true; }
     public function deleteMultiple($keys): bool { return true; }
     public function has($key): bool { return isset(self::$data[$key]); }
@@ -114,13 +122,13 @@ $http = new HttpServer(async(function (ServerRequestInterface $request) use ($me
         $start = microtime(true);
         $tracker->lastStatus = null;
         try {
-            $res = $memoryManager->wrap('georgia_flag', function() use ($browser) {
+            $res = await($memoryManager->wrap('georgia_flag', function() use ($browser) {
                 return $browser->get('https://restcountries.com/v3.1/name/georgia')
                     ->then(function ($response) {
                         $data = json_decode((string)$response->getBody(), true);
                         return $data[0]['flags']['png'] ?? '';
                     });
-            }, new CacheOptions(ttl: 15))->wait();
+            }, new CacheOptions(ttl: 15)));
 
             $source = 'fresh';
             if ($tracker->lastStatus === 'hit') $source = 'cache';
@@ -144,9 +152,9 @@ $http = new HttpServer(async(function (ServerRequestInterface $request) use ($me
     // 3. Memory Benchmark
     if ($path === '/api/memory') {
         $start = microtime(true);
-        $res = $memoryManager->wrap('shared_benchmark', function() use ($browser) {
-            return await($browser->get('https://www.google.com')->then(fn() => "Origin OK"));
-        }, $options)->wait();
+        $res = await($memoryManager->wrap('shared_benchmark', function() use ($browser) {
+            return $browser->get('https://www.google.com')->then(fn() => "Origin OK");
+        }, $options));
 
         return Response::json([
             'latency' => round(microtime(true) - $start, 4),
@@ -158,9 +166,9 @@ $http = new HttpServer(async(function (ServerRequestInterface $request) use ($me
     // 4. Chain Benchmark (L1 + L2)
     if ($path === '/api/chain') {
         $start = microtime(true);
-        $res = $chainManager->wrap('shared_benchmark', function() use ($browser) {
-            return await($browser->get('https://www.google.com')->then(fn() => "Origin OK"));
-        }, $options)->wait();
+        $res = await($chainManager->wrap('shared_benchmark', function() use ($browser) {
+            return $browser->get('https://www.google.com')->then(fn() => "Origin OK");
+        }, $options));
 
         return Response::json([
             'latency' => round(microtime(true) - $start, 4),

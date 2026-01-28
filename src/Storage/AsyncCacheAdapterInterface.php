@@ -25,51 +25,51 @@
 
 namespace Fyennyi\AsyncCache\Storage;
 
-use Fyennyi\AsyncCache\Core\Future;
+use React\Promise\PromiseInterface;
 
 /**
- * Interface for truly asynchronous cache adapters
+ * Common interface for all asynchronous cache storage backends
  */
 interface AsyncCacheAdapterInterface
 {
     /**
-     * Retrieves an item from the cache
+     * Retrieves an item by its key
      *
-     * @param  string  $key  The unique key of this item in the cache
-     * @return Future        Resolves to the cached value or null on miss
+     * @param  string  $key  The unique identifier of the item
+     * @return PromiseInterface Resolving to the raw value or null if not found
      */
-    public function get(string $key) : Future;
-
-     /**
-      * Obtains multiple cache items by their unique keys
-      *
-      * @param  iterable<string>  $keys  A list of keys that can be obtained in a single operation
-      * @return Future            Resolves to an array of key => value pairs
-      */
-    public function getMultiple(iterable $keys) : Future;
+    public function get(string $key) : PromiseInterface;
 
     /**
-     * Persists data in the cache, uniquely referenced by a key
+     * Retrieves multiple items by their keys
      *
-     * @param  string    $key    The key of the item to store
-     * @param  mixed     $value  The value of the item to store
-     * @param  int|null  $ttl    Optional. The TTL value of this item
-     * @return Future            Resolves to true on success and false on failure
+     * @param  iterable<string>  $keys  A list of keys to retrieve
+     * @return PromiseInterface         Resolving to an associative array of key => value pairs
      */
-    public function set(string $key, mixed $value, ?int $ttl = null) : Future;
+    public function getMultiple(iterable $keys) : PromiseInterface;
 
     /**
-     * Deletes an item from the cache by its unique key
+     * Persists an item in the cache
      *
-     * @param  string  $key  The unique cache key of the item to delete
-     * @return Future        Resolves to true on success and false on failure
+     * @param  string    $key    The unique identifier of the item
+     * @param  mixed     $value  The value to store (must be serializable)
+     * @param  int|null  $ttl    Optional time to live in seconds
+     * @return PromiseInterface Resolving to true on success, false otherwise
      */
-    public function delete(string $key) : Future;
+    public function set(string $key, mixed $value, ?int $ttl = null) : PromiseInterface;
 
     /**
-     * Wipes clean the entire cache's keys
+     * Removes an item by its key
      *
-     * @return Future Resolves to true on success and false on failure
+     * @param  string  $key  The unique identifier of the item to remove
+     * @return PromiseInterface Resolving to true on success, false otherwise
      */
-    public function clear() : Future;
+    public function delete(string $key) : PromiseInterface;
+
+    /**
+     * Wipes all entries from the cache
+     *
+     * @return PromiseInterface Resolving to true on success, false otherwise
+     */
+    public function clear() : PromiseInterface;
 }

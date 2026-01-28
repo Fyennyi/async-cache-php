@@ -26,43 +26,32 @@
 namespace Fyennyi\AsyncCache\Middleware;
 
 use Fyennyi\AsyncCache\Core\CacheContext;
-use Fyennyi\AsyncCache\Core\Future;
+use React\Promise\PromiseInterface;
 
 /**
- * Implementation of the Singleflight pattern using passive Futures to share results
+ * Middleware that prevents duplicate concurrent requests for the same key
  */
 class CoalesceMiddleware implements MiddlewareInterface
 {
-    /** @var array<string, Future> Tracks currently in-flight futures by key */
-    private static array $in_flight = [];
+    /** @var array<string, PromiseInterface> */
+    private array $pending = [];
 
     /**
-     * @param  CacheContext  $context  The resolution state
-     * @param  callable      $next     Next handler in the chain
-     * @return Future                  The (possibly shared) result future
+     * @inheritDoc
      */
-    public function handle(CacheContext $context, callable $next) : Future
+    public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
-        $key = $context->key;
-
-        if (isset(self::$in_flight[$key])) {
-            return self::$in_flight[$key];
+        if (isset($this->pending[$context->key])) {
+            return $this->pending[$context->key];
         }
 
-        /** @var Future $future */
-        $future = $next($context);
-        self::$in_flight[$key] = $future;
+        $promise = $next($context);
+        $this->pending[$context->key] = $promise;
 
-        // Clean up when the operation completes (success or failure)
-        $future->onResolve(
-            function () use ($key) {
-                unset(self::$in_flight[$key]);
-            },
-            function () use ($key) {
-                unset(self::$in_flight[$key]);
-            }
-        );
+        $promise->finally(function () use ($context) {
+            unset($this->pending[$context->key]);
+        });
 
-        return $future;
+        return $promise;
     }
 }

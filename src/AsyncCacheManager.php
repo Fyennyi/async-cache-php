@@ -27,8 +27,6 @@ namespace Fyennyi\AsyncCache;
 
 use Fyennyi\AsyncCache\Bridge\PromiseAdapter;
 use Fyennyi\AsyncCache\Core\CacheContext;
-use Fyennyi\AsyncCache\Core\Deferred;
-use Fyennyi\AsyncCache\Core\Future;
 use Fyennyi\AsyncCache\Core\Pipeline;
 use Fyennyi\AsyncCache\Core\Timer;
 use Fyennyi\AsyncCache\Middleware\AsyncLockMiddleware;
@@ -36,6 +34,7 @@ use Fyennyi\AsyncCache\Middleware\CacheLookupMiddleware;
 use Fyennyi\AsyncCache\Middleware\CoalesceMiddleware;
 use Fyennyi\AsyncCache\Middleware\SourceFetchMiddleware;
 use Fyennyi\AsyncCache\Middleware\StaleOnErrorMiddleware;
+use Fyennyi\AsyncCache\Middleware\TagValidationMiddleware;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Fyennyi\AsyncCache\Storage\AsyncCacheAdapterInterface;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
@@ -46,12 +45,14 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface as PsrCacheInterface;
 use React\Cache\CacheInterface as ReactCacheInterface;
+use React\Promise\Deferred;
+use React\Promise\PromiseInterface;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\SemaphoreStore;
 use Symfony\Component\RateLimiter\LimiterInterface;
 
 /**
- * Universal Asynchronous Cache Manager powered by native Futures
+ * Universal Asynchronous Cache Manager powered by ReactPHP Promises
  */
 class AsyncCacheManager
 {
@@ -89,42 +90,36 @@ class AsyncCacheManager
         $this->storage = new CacheStorage($cache_adapter, $this->logger, $serializer);
         $this->lock_factory = $lock_factory ?? new LockFactory(new SemaphoreStore());
 
-        if (empty($middlewares)) {
-            $middlewares = [
-                new CoalesceMiddleware(),
-                new StaleOnErrorMiddleware($this->logger, $this->dispatcher),
-                new CacheLookupMiddleware($this->storage, $this->logger, $this->dispatcher),
-                new AsyncLockMiddleware($this->lock_factory, $this->storage, $this->logger, $this->dispatcher),
-                new SourceFetchMiddleware($this->storage, $this->logger, $this->dispatcher)
-            ];
-        }
+        $default_middlewares = [
+            new CoalesceMiddleware(),
+            new StaleOnErrorMiddleware($this->logger, $this->dispatcher),
+            new CacheLookupMiddleware($this->storage, $this->logger, $this->dispatcher),
+            new TagValidationMiddleware($this->storage, $this->logger),
+            new AsyncLockMiddleware($this->lock_factory, $this->storage, $this->logger, $this->dispatcher),
+            new SourceFetchMiddleware($this->storage, $this->logger, $this->dispatcher)
+        ];
 
-        $this->pipeline = new Pipeline($middlewares);
+        $this->pipeline = new Pipeline(array_merge($middlewares, $default_middlewares));
     }
 
     /**
-     * Wraps an operation with caching and returns a library-native Future
+     * Wraps an operation with caching and returns a Promise
      *
-     * @param  string        $key              Cache key identifier
-     * @param  callable      $promise_factory  Function that returns a value or promise
-     * @param  CacheOptions  $options          Caching configuration
-     * @return Future                          Native future representing the result
+     * @param  string        $key              Unique cache key identifier for the operation
+     * @param  callable      $promise_factory  Callback function that returns a value or a promise
+     * @param  CacheOptions  $options          Caching configuration for this specific request
+     * @return PromiseInterface                A promise representing the eventual result of the operation
      */
-    public function wrap(string $key, callable $promise_factory, CacheOptions $options) : Future
+    public function wrap(string $key, callable $promise_factory, CacheOptions $options) : PromiseInterface
     {
         $context = new CacheContext($key, $promise_factory, $options);
 
-        // Execute the pipeline. The result is a Future from the last middleware.
+        // Execute the pipeline.
         return $this->pipeline->send($context, function (CacheContext $ctx) {
             try {
-                /** @var callable $factory */
-                $factory = $ctx->promise_factory;
-                $res = $factory();
-                return PromiseAdapter::toFuture($res);
+                return PromiseAdapter::toPromise(($ctx->promise_factory)());
             } catch (\Throwable $e) {
-                $deferred = new Deferred();
-                $deferred->reject($e);
-                return $deferred->future();
+                return \React\Promise\reject($e);
             }
         });
     }
@@ -132,76 +127,76 @@ class AsyncCacheManager
     /**
      * Atomically increments a cached integer value
      *
-     * @param  string             $key      The key to increment
-     * @param  int                $step     Increment step value
-     * @param  CacheOptions|null  $options  Optional caching options
-     * @return Future                       Future resolving to the new value
+     * @param  string             $key      The cache key to increment identifier
+     * @param  int                $step     Value to add to the existing counter
+     * @param  CacheOptions|null  $options  Optional caching options for persistence
+     * @return PromiseInterface             Promise resolving to the new integer value after increment
      */
-    public function increment(string $key, int $step = 1, ?CacheOptions $options = null) : Future
+    public function increment(string $key, int $step = 1, ?CacheOptions $options = null) : PromiseInterface
     {
         $options = $options ?? new CacheOptions();
         $lock_key = 'lock:counter:' . $key;
-        $deferred = new Deferred();
+        $master_deferred = new Deferred();
 
         $start_time = microtime(true);
         $timeout = 10.0;
 
-        $attempt = function () use (&$attempt, $key, $step, $options, $lock_key, $deferred, $start_time, $timeout) {
+        $attempt = function () use (&$attempt, $key, $step, $options, $lock_key, $master_deferred, $start_time, $timeout) {
             $lock = $this->lock_factory->createLock($lock_key, 10.0);
 
             if ($lock->acquire(false)) {
-                $this->storage->get($key, $options)->onResolve(
-                    function ($item) use ($key, $step, $options, $lock, $deferred) {
+                $this->storage->get($key, $options)->then(
+                    function ($item) use ($key, $step, $options, $lock, $master_deferred) {
                         try {
                             /** @var \Fyennyi\AsyncCache\Model\CachedItem|null $item */
                             $current_value = ($item && is_numeric($item->data)) ? (int) $item->data : 0;
                             $new_value = $current_value + $step;
 
-                            $this->storage->set($key, $new_value, $options)->onResolve(
-                                function () use ($lock, $deferred, $new_value) {
+                            $this->storage->set($key, $new_value, $options)->then(
+                                function () use ($lock, $master_deferred, $new_value) {
                                     $lock->release();
-                                    $deferred->resolve($new_value);
+                                    $master_deferred->resolve($new_value);
                                 },
-                                function ($e) use ($lock, $deferred) {
+                                function ($e) use ($lock, $master_deferred) {
                                     $lock->release();
-                                    $deferred->reject($e);
+                                    $master_deferred->reject($e);
                                 }
                             );
                         } catch (\Throwable $e) {
                             $lock->release();
-                            $deferred->reject($e);
+                            $master_deferred->reject($e);
                         }
                     },
-                    function ($e) use ($lock, $deferred) {
+                    function ($e) use ($lock, $master_deferred) {
                         $lock->release();
-                        $deferred->reject($e);
+                        $master_deferred->reject($e);
                     }
                 );
                 return;
             }
 
             if (microtime(true) - $start_time >= $timeout) {
-                $deferred->reject(new \RuntimeException("Could not acquire lock for incrementing key: $key"));
+                $master_deferred->reject(new \RuntimeException("Could not acquire lock for incrementing key: $key"));
                 return;
             }
 
-            Timer::delay(0.05)->onResolve($attempt);
+            Timer::delay(0.05)->then($attempt);
         };
 
         $attempt();
 
-        return $deferred->future();
+        return $master_deferred->promise();
     }
 
     /**
      * Atomically decrements a cached integer value
      *
-     * @param  string             $key      The key to decrement
-     * @param  int                $step     Decrement step value
-     * @param  CacheOptions|null  $options  Optional caching options
-     * @return Future                       Future resolving to the new value
+     * @param  string             $key      The cache key identifier to decrement
+     * @param  int                $step     Value to subtract from the existing counter
+     * @param  CacheOptions|null  $options  Optional caching options for persistence
+     * @return PromiseInterface             Promise resolving to the new integer value after decrement
      */
-    public function decrement(string $key, int $step = 1, ?CacheOptions $options = null) : Future
+    public function decrement(string $key, int $step = 1, ?CacheOptions $options = null) : PromiseInterface
     {
         return $this->increment($key, -$step, $options);
     }
@@ -209,10 +204,10 @@ class AsyncCacheManager
     /**
      * Invalidates all cache entries associated with the given tags
      *
-     * @param  string[]  $tags  List of tags to invalidate
-     * @return Future           Resolves to true on success
+     * @param  string[]  $tags  List of tag names to invalidate
+     * @return PromiseInterface Resolves to true on successful invalidation
      */
-    public function invalidateTags(array $tags) : Future
+    public function invalidateTags(array $tags) : PromiseInterface
     {
         return $this->storage->invalidateTags($tags);
     }
@@ -220,9 +215,9 @@ class AsyncCacheManager
     /**
      * Clears the entire cache storage
      *
-     * @return Future Resolves to true on success
+     * @return PromiseInterface Resolves to true on successful wipe
      */
-    public function clear() : Future
+    public function clear() : PromiseInterface
     {
         return $this->storage->clear();
     }
@@ -230,10 +225,10 @@ class AsyncCacheManager
     /**
      * Deletes a specific item from the cache
      *
-     * @param  string  $key  Item identifier
-     * @return Future        Resolves to true on success
+     * @param  string  $key  Item identifier to remove
+     * @return PromiseInterface Promise resolving to true on successful deletion
      */
-    public function delete(string $key) : Future
+    public function delete(string $key) : PromiseInterface
     {
         return $this->storage->delete($key);
     }
@@ -241,7 +236,7 @@ class AsyncCacheManager
     /**
      * Returns the rate limiter instance
      *
-     * @return LimiterInterface|null
+     * @return LimiterInterface|null The Symfony Rate Limiter or null if not set
      */
     public function getRateLimiter() : ?LimiterInterface
     {

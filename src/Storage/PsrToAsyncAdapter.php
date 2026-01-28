@@ -25,9 +25,10 @@
 
 namespace Fyennyi\AsyncCache\Storage;
 
-use Fyennyi\AsyncCache\Core\Deferred;
-use Fyennyi\AsyncCache\Core\Future;
 use Psr\SimpleCache\CacheInterface as PsrCacheInterface;
+use React\Promise\PromiseInterface;
+use function React\Promise\reject;
+use function React\Promise\resolve;
 
 /**
  * Wraps a synchronous PSR-16 cache to act as an asynchronous adapter
@@ -42,72 +43,62 @@ class PsrToAsyncAdapter implements AsyncCacheAdapterInterface
     /**
      * @inheritDoc
      */
-    public function get(string $key) : Future
+    public function get(string $key) : PromiseInterface
     {
-        $deferred = new Deferred();
         try {
-            $deferred->resolve($this->psr_cache->get($key));
+            return resolve($this->psr_cache->get($key));
         } catch (\Throwable $e) {
-            $deferred->reject($e);
+            return reject($e);
         }
-        return $deferred->future();
     }
 
     /**
      * @inheritDoc
      *
-     * @param  iterable<string>  $keys
+     * @param  iterable<string>  $keys  A list of cache keys to retrieve from the synchronous storage
      */
-    public function getMultiple(iterable $keys) : Future
+    public function getMultiple(iterable $keys) : PromiseInterface
     {
-        $deferred = new Deferred();
         try {
-            $deferred->resolve($this->psr_cache->getMultiple($keys));
+            return resolve($this->psr_cache->getMultiple($keys));
         } catch (\Throwable $e) {
-            $deferred->reject($e);
+            return reject($e);
         }
-        return $deferred->future();
     }
 
     /**
      * @inheritDoc
      */
-    public function set(string $key, mixed $value, ?int $ttl = null) : Future
+    public function set(string $key, mixed $value, ?int $ttl = null) : PromiseInterface
     {
-        $deferred = new Deferred();
         try {
-            $deferred->resolve($this->psr_cache->set($key, $value, $ttl));
+            return resolve($this->psr_cache->set($key, $value, $ttl));
         } catch (\Throwable $e) {
-            $deferred->reject($e);
+            return reject($e);
         }
-        return $deferred->future();
     }
 
     /**
      * @inheritDoc
      */
-    public function delete(string $key) : Future
+    public function delete(string $key) : PromiseInterface
     {
-        $deferred = new Deferred();
         try {
-            $deferred->resolve($this->psr_cache->delete($key));
+            return resolve($this->psr_cache->delete($key));
         } catch (\Throwable $e) {
-            $deferred->reject($e);
+            return reject($e);
         }
-        return $deferred->future();
     }
 
     /**
      * @inheritDoc
      */
-    public function clear() : Future
+    public function clear() : PromiseInterface
     {
-        $deferred = new Deferred();
         try {
-            $deferred->resolve($this->psr_cache->clear());
+            return resolve($this->psr_cache->clear());
         } catch (\Throwable $e) {
-            $deferred->reject($e);
+            return reject($e);
         }
-        return $deferred->future();
     }
 }
