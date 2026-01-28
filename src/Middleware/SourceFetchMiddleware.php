@@ -55,9 +55,9 @@ class SourceFetchMiddleware implements MiddlewareInterface
     public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
         $this->logger->debug('AsyncCache MISS: fetching from source', ['key' => $context->key]);
-        $this->dispatcher?->dispatch(new CacheMissEvent($context->key));
+        $this->dispatcher?->dispatch(new CacheMissEvent($context->key, (float) $context->clock->now()->format('U.u')));
 
-        $start = microtime(true);
+        $start = (float) $context->clock->now()->format('U.u');
 
         try {
             /** @var PromiseInterface<T> $promise */
@@ -67,12 +67,14 @@ class SourceFetchMiddleware implements MiddlewareInterface
             $result = $promise->then(
                 /** @param T $data */
                 function ($data) use ($context, $start) {
-                    $generation_time = microtime(true) - $start;
+                    $now = (float) $context->clock->now()->format('U.u');
+                    $generation_time = $now - $start;
                     $this->dispatcher?->dispatch(new CacheStatusEvent(
                         $context->key,
                         CacheStatus::Miss,
-                        microtime(true) - $context->start_time,
-                        $context->options->tags
+                        $now - $context->start_time,
+                        $context->options->tags,
+                        $now
                     ));
 
                     // Background persistence - handle errors to avoid breaking the response

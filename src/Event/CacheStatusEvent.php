@@ -33,17 +33,19 @@ use Fyennyi\AsyncCache\Enum\CacheStatus;
 class CacheStatusEvent extends AsyncCacheEvent
 {
     /**
-     * @param string      $key     Resource identifier
-     * @param CacheStatus $status  The resulting status (Hit, Miss, Stale, etc.)
-     * @param float       $latency Time taken to resolve the request in seconds
-     * @param string[]    $tags    Cache tags associated with the entry
+     * @param string      $key       Resource identifier
+     * @param CacheStatus $status    The resulting status (Hit, Miss, Stale, etc.)
+     * @param float       $latency   Time taken to resolve the request in seconds
+     * @param string[]    $tags      Cache tags associated with the entry
+     * @param float|null  $timestamp Optional explicit timestamp
      */
     public function __construct(
         string $key,
         public readonly CacheStatus $status,
         public readonly float $latency = 0.0,
-        public readonly array $tags = []
+        public readonly array $tags = [],
+        ?float $timestamp = null
     ) {
-        parent::__construct($key, microtime(true));
+        parent::__construct($key, $timestamp ?? microtime(true));
     }
 }

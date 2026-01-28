@@ -31,11 +31,12 @@ namespace Fyennyi\AsyncCache\Event;
 class RateLimitExceededEvent extends AsyncCacheEvent
 {
     /**
-     * @param string $key            The resource key being requested
-     * @param string $rate_limit_key The identifier of the rate limit bucket
+     * @param string     $key            The resource key being requested
+     * @param string     $rate_limit_key The identifier of the rate limit bucket
+     * @param float|null $timestamp      Optional explicit timestamp
      */
-    public function __construct(string $key, public readonly string $rate_limit_key)
+    public function __construct(string $key, public readonly string $rate_limit_key, ?float $timestamp = null)
     {
-        parent::__construct($key, microtime(true));
+        parent::__construct($key, $timestamp ?? microtime(true));
     }
 }

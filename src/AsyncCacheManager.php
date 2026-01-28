@@ -38,6 +38,7 @@ use Fyennyi\AsyncCache\Storage\AsyncCacheAdapterInterface;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use Fyennyi\AsyncCache\Storage\PsrToAsyncAdapter;
 use Fyennyi\AsyncCache\Storage\ReactCacheAdapter;
+use Psr\Clock\ClockInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -45,6 +46,7 @@ use Psr\SimpleCache\CacheInterface as PsrCacheInterface;
 use React\Cache\CacheInterface as ReactCacheInterface;
 use React\Promise\Deferred;
 use React\Promise\PromiseInterface;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\SemaphoreStore;
 use Symfony\Component\RateLimiter\LimiterInterface;
@@ -58,6 +60,7 @@ class AsyncCacheManager
     private Pipeline $pipeline;
     private CacheStorage $storage;
     private LockFactory $lock_factory;
+    private ClockInterface $clock;
 
     /**
      * @param PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter The cache implementation
@@ -67,6 +70,7 @@ class AsyncCacheManager
      * @param \Fyennyi\AsyncCache\Middleware\MiddlewareInterface[]             $middlewares   Optional custom middleware stack
      * @param EventDispatcherInterface|null                                    $dispatcher    The PSR-14 event dispatcher
      * @param SerializerInterface|null                                         $serializer    The custom serializer
+     * @param ClockInterface|null                                              $clock         The PSR-20 clock implementation
      */
     public function __construct(
         PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter,
@@ -75,9 +79,11 @@ class AsyncCacheManager
         ?LockFactory $lock_factory = null,
         array $middlewares = [],
         private ?EventDispatcherInterface $dispatcher = null,
-        ?SerializerInterface $serializer = null
+        ?SerializerInterface $serializer = null,
+        ?ClockInterface $clock = null
     ) {
         $this->logger = $this->logger ?? new NullLogger();
+        $this->clock = $clock ?? new NativeClock();
 
         // Auto-detect and wrap the adapter type for full async support
         if ($cache_adapter instanceof PsrCacheInterface) {
@@ -86,7 +92,7 @@ class AsyncCacheManager
             $cache_adapter = new ReactCacheAdapter($cache_adapter);
         }
 
-        $this->storage = new CacheStorage($cache_adapter, $this->logger, $serializer);
+        $this->storage = new CacheStorage($cache_adapter, $this->logger, $serializer, $this->clock);
         $this->lock_factory = $lock_factory ?? new LockFactory(new SemaphoreStore());
 
         $default_middlewares = [
@@ -111,7 +117,7 @@ class AsyncCacheManager
      */
     public function wrap(string $key, callable $promise_factory, CacheOptions $options) : PromiseInterface
     {
-        $context = new CacheContext($key, $promise_factory, $options);
+        $context = new CacheContext($key, $promise_factory, $options, $this->clock);
 
         // Execute the pipeline.
         return $this->pipeline->send($context, function (CacheContext $ctx) {
@@ -139,7 +145,7 @@ class AsyncCacheManager
         /** @var Deferred<int> $master_deferred */
         $master_deferred = new Deferred();
 
-        $start_time = microtime(true);
+        $start_time = (float) $this->clock->now()->format('U.u');
         $timeout = 10.0;
 
         $attempt = function () use (&$attempt, $key, $step, $options, $lock_key, $master_deferred, $start_time, $timeout) {
@@ -177,7 +183,7 @@ class AsyncCacheManager
                 return;
             }
 
-            if (microtime(true) - $start_time >= $timeout) {
+            if ((float) $this->clock->now()->format('U.u') - $start_time >= $timeout) {
                 $master_deferred->reject(new \RuntimeException("Could not acquire lock for incrementing key: $key"));
 
                 return;

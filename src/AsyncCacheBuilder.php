@@ -28,6 +28,7 @@ namespace Fyennyi\AsyncCache;
 use Fyennyi\AsyncCache\Middleware\MiddlewareInterface;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Fyennyi\AsyncCache\Storage\AsyncCacheAdapterInterface;
+use Psr\Clock\ClockInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface as PsrCacheInterface;
@@ -47,6 +48,7 @@ class AsyncCacheBuilder
     private array $middlewares = [];
     private ?EventDispatcherInterface $dispatcher = null;
     private ?SerializerInterface $serializer = null;
+    private ?ClockInterface $clock = null;
 
     /**
      * @param PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter The cache implementation
@@ -145,6 +147,19 @@ class AsyncCacheBuilder
     }
 
     /**
+     * Sets the PSR-20 clock.
+     *
+     * @param  ClockInterface $clock Clock implementation
+     * @return self           The current builder instance for chaining
+     */
+    public function withClock(ClockInterface $clock) : self
+    {
+        $this->clock = $clock;
+
+        return $this;
+    }
+
+    /**
      * Finalizes the configuration and creates the AsyncCacheManager.
      *
      * @return AsyncCacheManager A fully configured manager instance
@@ -158,7 +173,8 @@ class AsyncCacheBuilder
             $this->lock_factory,
             $this->middlewares,
             $this->dispatcher,
-            $this->serializer
+            $this->serializer,
+            $this->clock
         );
     }
 }

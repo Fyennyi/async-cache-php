@@ -52,10 +52,11 @@ class CachedItem
     /**
      * Checks if the item is still within its logical TTL.
      *
-     * @return bool True if fresh, false if stale
+     * @param  int|null $now Optional Unix timestamp to check against
+     * @return bool     True if fresh, false if stale
      */
-    public function isFresh() : bool
+    public function isFresh(?int $now = null) : bool
     {
-        return time() < $this->logical_expire_time;
+        return ($now ?? time()) < $this->logical_expire_time;
     }
 }

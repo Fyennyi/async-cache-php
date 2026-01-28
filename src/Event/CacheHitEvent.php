@@ -31,11 +31,12 @@ namespace Fyennyi\AsyncCache\Event;
 class CacheHitEvent extends AsyncCacheEvent
 {
     /**
-     * @param string $key  Resource identifier
-     * @param mixed  $data The cached data retrieved
+     * @param string     $key       Resource identifier
+     * @param mixed      $data      The cached data retrieved
+     * @param float|null $timestamp Optional explicit timestamp
      */
-    public function __construct(string $key, public readonly mixed $data)
+    public function __construct(string $key, public readonly mixed $data, ?float $timestamp = null)
     {
-        parent::__construct($key, microtime(true));
+        parent::__construct($key, $timestamp ?? microtime(true));
     }
 }

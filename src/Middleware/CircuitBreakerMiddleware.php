@@ -82,7 +82,7 @@ class CircuitBreakerMiddleware implements MiddlewareInterface
 
         if ($last_failure_time > 0) {
             // Half-open check: allow a single probe request after timeout
-            if (time() - $last_failure_time < $this->retry_timeout) {
+            if ($context->clock->now()->getTimestamp() - $last_failure_time < $this->retry_timeout) {
                 $this->logger->error('AsyncCache CIRCUIT_BREAKER: Open state, blocking request', ['key' => $context->key]);
                 /** @var PromiseInterface<never> $reject */
                 $reject = \React\Promise\reject(new \RuntimeException("Circuit Breaker is OPEN for key: {$context->key}"));
@@ -114,7 +114,7 @@ class CircuitBreakerMiddleware implements MiddlewareInterface
                 return $data;
             },
             function (\Throwable $reason) use ($state_key, $failure_key, $last_fail_key, $context) {
-                $this->onFailure($state_key, $failure_key, $last_fail_key, $context->key);
+                $this->onFailure($state_key, $failure_key, $last_fail_key, $context);
                 throw $reason;
             }
         );
@@ -136,7 +136,7 @@ class CircuitBreakerMiddleware implements MiddlewareInterface
     /**
      * Handles request failure.
      */
-    private function onFailure(string $state_key, string $failure_key, string $last_fail_key, string $key) : void
+    private function onFailure(string $state_key, string $failure_key, string $last_fail_key, CacheContext $context) : void
     {
         /** @var mixed $val */
         $val = $this->storage->get($failure_key, 0);
@@ -145,9 +145,9 @@ class CircuitBreakerMiddleware implements MiddlewareInterface
 
         if ($failures >= $this->failure_threshold) {
             $this->storage->set($state_key, self::STATE_OPEN);
-            $this->storage->set($last_fail_key, time());
+            $this->storage->set($last_fail_key, $context->clock->now()->getTimestamp());
             $this->logger->critical('AsyncCache CIRCUIT_BREAKER: Failure threshold reached, opening circuit', [
-                'key' => $key,
+                'key' => $context->key,
                 'failures' => $failures
             ]);
         }

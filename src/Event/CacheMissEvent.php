@@ -31,10 +31,11 @@ namespace Fyennyi\AsyncCache\Event;
 class CacheMissEvent extends AsyncCacheEvent
 {
     /**
-     * @param string $key Resource identifier
+     * @param string     $key       Resource identifier
+     * @param float|null $timestamp Optional explicit timestamp
      */
-    public function __construct(string $key)
+    public function __construct(string $key, ?float $timestamp = null)
     {
-        parent::__construct($key, microtime(true));
+        parent::__construct($key, $timestamp ?? microtime(true));
     }
 }

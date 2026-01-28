@@ -27,6 +27,7 @@ namespace Fyennyi\AsyncCache\Core;
 
 use Fyennyi\AsyncCache\CacheOptions;
 use Fyennyi\AsyncCache\Model\CachedItem;
+use Psr\Clock\ClockInterface;
 
 /**
  * Data Transfer Object that carries the state of a single cache resolution through the middleware pipeline.
@@ -40,15 +41,17 @@ class CacheContext
     public float $start_time;
 
     /**
-     * @param string       $key             The cache key identifier
-     * @param mixed        $promise_factory Callback to fetch fresh data from source
-     * @param CacheOptions $options         Resolved caching options for this request
+     * @param string         $key             The cache key identifier
+     * @param mixed          $promise_factory Callback to fetch fresh data from source
+     * @param CacheOptions   $options         Resolved caching options for this request
+     * @param ClockInterface $clock           PSR-20 Clock implementation
      */
     public function __construct(
         public readonly string $key,
         public readonly mixed $promise_factory,
-        public readonly CacheOptions $options
+        public readonly CacheOptions $options,
+        public readonly ClockInterface $clock
     ) {
-        $this->start_time = microtime(true);
+        $this->start_time = (float) $this->clock->now()->format('U.u');
     }
 }

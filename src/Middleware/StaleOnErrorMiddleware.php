@@ -74,11 +74,13 @@ class StaleOnErrorMiddleware implements MiddlewareInterface
                         'reason' => $msg
                     ]);
 
+                    $now = (float) $context->clock->now()->format('U.u');
                     $this->dispatcher?->dispatch(new CacheStatusEvent(
                         $context->key,
                         CacheStatus::Stale,
-                        microtime(true) - $context->start_time,
-                        $context->options->tags
+                        $now - $context->start_time,
+                        $context->options->tags,
+                        $now
                     ));
 
                     /** @var T $stale_data */

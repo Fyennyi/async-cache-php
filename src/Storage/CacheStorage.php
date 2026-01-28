@@ -29,8 +29,10 @@ use Fyennyi\AsyncCache\CacheOptions;
 use Fyennyi\AsyncCache\Model\CachedItem;
 use Fyennyi\AsyncCache\Serializer\PhpSerializer;
 use Fyennyi\AsyncCache\Serializer\SerializerInterface;
+use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 use React\Promise\PromiseInterface;
+use Symfony\Component\Clock\NativeClock;
 use function React\Promise\all;
 
 /**
@@ -40,18 +42,22 @@ class CacheStorage
 {
     private const TAG_PREFIX = 'tag_v:';
     private SerializerInterface $serializer;
+    private ClockInterface $clock;
 
     /**
      * @param AsyncCacheAdapterInterface $adapter    The asynchronous cache adapter
      * @param LoggerInterface            $logger     Logger for reporting errors and debug info
      * @param SerializerInterface|null   $serializer Custom serializer implementation
+     * @param ClockInterface|null        $clock      PSR-20 Clock implementation
      */
     public function __construct(
         private AsyncCacheAdapterInterface $adapter,
         private LoggerInterface $logger,
-        ?SerializerInterface $serializer = null
+        ?SerializerInterface $serializer = null,
+        ?ClockInterface $clock = null
     ) {
         $this->serializer = $serializer ?? new PhpSerializer();
+        $this->clock = $clock ?? new NativeClock();
     }
 
     /**
@@ -123,7 +129,7 @@ class CacheStorage
 
             return new CachedItem(
                 data: $data,
-                logical_expire_time: time() + $options->ttl,
+                logical_expire_time: $this->clock->now()->getTimestamp() + $options->ttl,
                 is_compressed: $is_compressed,
                 generation_time: $generation_time,
                 tag_versions: $tag_versions

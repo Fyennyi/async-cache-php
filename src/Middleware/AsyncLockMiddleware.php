@@ -80,8 +80,9 @@ class AsyncLockMiddleware implements MiddlewareInterface
         }
 
         if (null !== $context->stale_item) {
-            $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, microtime(true) - $context->start_time, $context->options->tags));
-            $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $context->stale_item->data));
+            $now = (float) $context->clock->now()->format('U.u');
+            $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, $now - $context->start_time, $context->options->tags, $now));
+            $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $context->stale_item->data, $now));
             /** @var T $stale_data */
             $stale_data = $context->stale_item->data;
 
@@ -90,7 +91,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
 
         $this->logger->debug('AsyncCache LOCK_BUSY: waiting for lock asynchronously', ['key' => $context->key]);
 
-        $start_time = microtime(true);
+        $start_time = (float) $context->clock->now()->format('U.u');
         $timeout = 10.0;
         $deferred = new Deferred();
 
@@ -104,8 +105,9 @@ class AsyncLockMiddleware implements MiddlewareInterface
 
                     $this->storage->get($context->key, $context->options)->then(
                         function ($cached_item) use ($context, $next, $lock_key, $start_time, $deferred) {
-                            if ($cached_item instanceof CachedItem && $cached_item->isFresh()) {
-                                $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, microtime(true) - $start_time, $context->options->tags));
+                            $now = (float) $context->clock->now()->format('U.u');
+                            if ($cached_item instanceof CachedItem && $cached_item->isFresh((int) $now)) {
+                                $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, $now - $start_time, $context->options->tags, $now));
                                 $this->releaseLock($lock_key);
                                 $deferred->resolve($cached_item->data);
 
@@ -130,7 +132,7 @@ class AsyncLockMiddleware implements MiddlewareInterface
                     return;
                 }
 
-                if (microtime(true) - $start_time >= $timeout) {
+                if ((float) $context->clock->now()->format('U.u') - $start_time >= $timeout) {
                     $deferred->reject(new \RuntimeException("Could not acquire lock for key: {$context->key} (Timeout)"));
 
                     return;

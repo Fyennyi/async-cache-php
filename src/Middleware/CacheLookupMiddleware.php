@@ -65,7 +65,7 @@ class CacheLookupMiddleware implements MiddlewareInterface
         // Basic tracing for debugging
         $this->logger->debug('CacheLookupMiddleware: handling cache context', ['key' => $context->key, 'strategy' => $context->options->strategy->value]);
         if (CacheStrategy::ForceRefresh === $context->options->strategy) {
-            $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Bypass, 0, $context->options->tags));
+            $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Bypass, 0, $context->options->tags, (float) $context->clock->now()->format('U.u')));
 
             return $next($context);
         }
@@ -75,21 +75,24 @@ class CacheLookupMiddleware implements MiddlewareInterface
             function ($cached_item) use ($context, $next) {
                 if ($cached_item instanceof CachedItem) {
                     $context->stale_item = $cached_item;
-                    $is_fresh = $cached_item->isFresh();
+                    $now_ts = $context->clock->now()->getTimestamp();
+                    $is_fresh = $cached_item->isFresh($now_ts);
 
                     if ($is_fresh && $context->options->x_fetch_beta > 0 && $cached_item->generation_time > 0) {
                         $rand = mt_rand(1, mt_getrandmax()) / mt_getrandmax();
-                        $check = time() - ($cached_item->generation_time * $context->options->x_fetch_beta * log($rand));
+                        $check = $now_ts - ($cached_item->generation_time * $context->options->x_fetch_beta * log($rand));
 
                         if ($check > $cached_item->logical_expire_time) {
-                            $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::XFetch, microtime(true) - $context->start_time, $context->options->tags));
+                            $now = (float) $context->clock->now()->format('U.u');
+                            $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::XFetch, $now - $context->start_time, $context->options->tags, $now));
                             $is_fresh = false;
                         }
                     }
 
                     if ($is_fresh) {
-                        $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, microtime(true) - $context->start_time, $context->options->tags));
-                        $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $cached_item->data));
+                        $now = (float) $context->clock->now()->format('U.u');
+                        $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Hit, $now - $context->start_time, $context->options->tags, $now));
+                        $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $cached_item->data, $now));
 
                         // If item has tags, we MUST continue to TagValidationMiddleware
                         if (! empty($cached_item->tag_versions)) {
@@ -103,8 +106,9 @@ class CacheLookupMiddleware implements MiddlewareInterface
                     }
 
                     if (CacheStrategy::Background === $context->options->strategy) {
-                        $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, microtime(true) - $context->start_time, $context->options->tags));
-                        $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $cached_item->data));
+                        $now = (float) $context->clock->now()->format('U.u');
+                        $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, $now - $context->start_time, $context->options->tags, $now));
+                        $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $cached_item->data, $now));
 
                         // Background fetch - catch errors to prevent unhandled rejection since this promise is not returned
                         $next($context)->catch(function (\Throwable $e) use ($context) {
