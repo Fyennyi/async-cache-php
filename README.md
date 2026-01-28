@@ -7,7 +7,7 @@
 [![Test Coverage](https://img.shields.io/codecov/c/github/Fyennyi/async-cache-php?label=Test%20Coverage&logo=codecov)](https://app.codecov.io/gh/Fyennyi/async-cache-php)
 [![Static Analysis](https://img.shields.io/github/actions/workflow/status/Fyennyi/async-cache-php/phpstan.yml?label=PHPStan&logo=github)](https://github.com/Fyennyi/async-cache-php/actions/workflows/phpstan.yml)
 
-An asynchronous caching abstraction layer for PHP with built-in rate limiting and stale-while-revalidate support. This library is designed to wrap promise-based operations (like Guzzle Promises) to provide robust caching strategies suitable for high-load or rate-limited API clients.
+An asynchronous caching abstraction layer for PHP with built-in rate limiting and stale-while-revalidate support. This library is designed to wrap promise-based operations (like ReactPHP Promises) to provide robust caching strategies suitable for high-load or rate-limited API clients.
 
 ## Features
 
@@ -53,9 +53,9 @@ Use the `wrap` method to cache a promise-based operation.
 ```php
 use Fyennyi\AsyncCache\CacheOptions;
 use Fyennyi\AsyncCache\Enum\CacheStrategy;
-use GuzzleHttp\Client;
+use React\Http\Browser;
 
-$client = new Client();
+$browser = new \React\Http\Browser();
 
 $options = new CacheOptions(
     ttl: 60,                        // Data is fresh for 60 seconds
@@ -64,12 +64,16 @@ $options = new CacheOptions(
 
 $promise = $manager->wrap(
     'cache_key_user_1',
-    fn() => $client->getAsync('https://api.example.com/users/1'),
+    fn() => $browser->get('https://api.example.com/users/1')->then(
+        fn($response) => (string)$response->getBody()
+    ),
     $options
 );
 
-// Wait for the result (non-blocking if used within ReactPHP event loop)
-$response = $promise->wait();
+// Handle the result asynchronously
+$promise->then(function ($data) {
+    echo "User data: " . $data;
+});
 ```
 
 ### Advanced Configuration Options
@@ -94,7 +98,9 @@ new CacheOptions(
 ### Atomic Increments
 
 ```php
-$newValue = $manager->increment('page_views', 1)->wait();
+$manager->increment('page_views', 1)->then(function($newValue) {
+    echo "New value: " . $newValue;
+});
 ```
 
 ## How It Works

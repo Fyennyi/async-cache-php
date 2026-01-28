@@ -7,7 +7,7 @@ An asynchronous caching abstraction layer for PHP with built-in rate limiting an
 
 ## Overview
 
-`fyennyi/async-cache-php` is designed to wrap promise-based operations (like Guzzle Promises) to provide robust caching strategies suitable for high-load or rate-limited API clients.
+`fyennyi/async-cache-php` is designed to wrap promise-based operations (like ReactPHP Promises) to provide robust caching strategies suitable for high-load or rate-limited API clients.
 
 It solves the common problem of handling expired cache items when the underlying data source (e.g., an external API) is currently rate-limited or slow.
 

@@ -56,7 +56,6 @@ nav:
     - X-Fetch & Stampede Protection: concepts/x-fetch.md
     - Cache TTL vs Grace Period: concepts/ttl.md
   - Advanced:
-    - Async Bridging: advanced/interoperability.md
     - Middleware Pipeline: advanced/middleware.md
     - Events & Telemetry: advanced/events.md
     - Serialization: advanced/serialization.md
