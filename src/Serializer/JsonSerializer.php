@@ -35,8 +35,7 @@ class JsonSerializer implements SerializerInterface
      */
     public function __construct(
         private int $options = 0
-    ) {
-    }
+    ) {}
 
     /**
      * @inheritDoc
@@ -44,7 +43,7 @@ class JsonSerializer implements SerializerInterface
      * @param  mixed  $data Data to be encoded into JSON format
      * @return string The resulting JSON-encoded string
      */
-    public function serialize(mixed $data): string
+    public function serialize(mixed $data) : string
     {
         return json_encode($data, $this->options) ?: '';
     }
@@ -55,8 +54,8 @@ class JsonSerializer implements SerializerInterface
      * @param  string $data The JSON-encoded string to decode
      * @return mixed  The decoded data structure (array or scalar)
      */
-    public function unserialize(string $data): mixed
+    public function unserialize(string $data) : mixed
     {
-        return json_decode($data, true);
+        return json_decode($data, true, 512, $this->options);
     }
 }

@@ -43,8 +43,7 @@ class SourceFetchMiddleware implements MiddlewareInterface
         private CacheStorage $storage,
         private LoggerInterface $logger,
         private ?EventDispatcherInterface $dispatcher = null
-    ) {
-    }
+    ) {}
 
     /**
      * @template T
@@ -53,7 +52,7 @@ class SourceFetchMiddleware implements MiddlewareInterface
      * @param  callable(CacheContext):PromiseInterface<T> $next
      * @return PromiseInterface<T>
      */
-    public function handle(CacheContext $context, callable $next): PromiseInterface
+    public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
         $this->logger->debug('AsyncCache MISS: fetching from source', ['key' => $context->key]);
         $this->dispatcher?->dispatch(new CacheMissEvent($context->key));
@@ -79,9 +78,6 @@ class SourceFetchMiddleware implements MiddlewareInterface
                     });
 
                     return $data;
-                },
-                function (\Throwable $e) {
-                    throw $e;
                 }
             );
 
