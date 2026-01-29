@@ -35,14 +35,11 @@ use Fyennyi\AsyncCache\Middleware\CoalesceMiddleware;
 use Fyennyi\AsyncCache\Middleware\SourceFetchMiddleware;
 use Fyennyi\AsyncCache\Middleware\StaleOnErrorMiddleware;
 use Fyennyi\AsyncCache\Middleware\TagValidationMiddleware;
-use Fyennyi\AsyncCache\Serializer\SerializerInterface;
 use Fyennyi\AsyncCache\Storage\AsyncCacheAdapterInterface;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use Fyennyi\AsyncCache\Storage\PsrToAsyncAdapter;
 use Fyennyi\AsyncCache\Storage\ReactCacheAdapter;
 use Psr\Clock\ClockInterface;
-use Psr\EventDispatcher\EventDispatcherInterface;
-use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface as PsrCacheInterface;
 use React\Cache\CacheInterface as ReactCacheInterface;
@@ -114,7 +111,7 @@ final class AsyncCacheManager
      *           ->build()
      *   );
      */
-    public static function configure(PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter): AsyncCacheConfigBuilder
+    public static function configure(PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter) : AsyncCacheConfigBuilder
     {
         return AsyncCacheConfig::builder($cache_adapter);
     }
@@ -134,7 +131,6 @@ final class AsyncCacheManager
      *   }, new CacheOptions(ttl: 60))->then(function ($value) {
      *       // $value is the cached or freshly fetched data
      *   });
-     *
      * @example
      *   // Using an async factory that returns a Promise
      *   $manager->wrap('user:42', function () use ($http) {
@@ -171,7 +167,6 @@ final class AsyncCacheManager
      *   $manager->increment('visits')->then(function (int $new) {
      *       echo "New visits count: $new\n";
      *   });
-     *
      * @example
      *   // Decrement by 2
      *   $manager->decrement('active_sessions', 2)->then(function (int $new) {

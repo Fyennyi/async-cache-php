@@ -60,7 +60,7 @@ class CacheContext
      *
      * @return float Elapsed time in seconds
      */
-    public function getElapsedTime(): float
+    public function getElapsedTime() : float
     {
         $now = (float) $this->clock->now()->format('U.u');
         return $now - $this->start_time;

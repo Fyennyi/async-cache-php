@@ -63,37 +63,37 @@ final class AsyncCacheConfig
         $this->middlewares = $middlewares;
     }
 
-    public function getCacheAdapter(): PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface
+    public function getCacheAdapter() : PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface
     {
         return $this->cache_adapter;
     }
 
-    public function getRateLimiter(): ?LimiterInterface
+    public function getRateLimiter() : ?LimiterInterface
     {
         return $this->rate_limiter;
     }
 
-    public function getLogger(): ?LoggerInterface
+    public function getLogger() : ?LoggerInterface
     {
         return $this->logger;
     }
 
-    public function getLockFactory(): ?LockFactory
+    public function getLockFactory() : ?LockFactory
     {
         return $this->lock_factory;
     }
 
-    public function getDispatcher(): ?EventDispatcherInterface
+    public function getDispatcher() : ?EventDispatcherInterface
     {
         return $this->dispatcher;
     }
 
-    public function getSerializer(): ?SerializerInterface
+    public function getSerializer() : ?SerializerInterface
     {
         return $this->serializer;
     }
 
-    public function getClock(): ?ClockInterface
+    public function getClock() : ?ClockInterface
     {
         return $this->clock;
     }
@@ -101,7 +101,7 @@ final class AsyncCacheConfig
     /**
      * @return MiddlewareInterface[]
      */
-    public function getMiddlewares(): array
+    public function getMiddlewares() : array
     {
         return $this->middlewares;
     }
@@ -109,7 +109,7 @@ final class AsyncCacheConfig
     /**
      * Creates a new configuration builder.
      */
-    public static function builder(PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter): AsyncCacheConfigBuilder
+    public static function builder(PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter) : AsyncCacheConfigBuilder
     {
         return new AsyncCacheConfigBuilder($cache_adapter);
     }

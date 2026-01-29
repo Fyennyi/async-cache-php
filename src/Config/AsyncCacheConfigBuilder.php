@@ -54,49 +54,49 @@ final class AsyncCacheConfigBuilder
         private readonly PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter
     ) {}
 
-    public function withRateLimiter(LimiterInterface $rate_limiter): self
+    public function withRateLimiter(LimiterInterface $rate_limiter) : self
     {
         $this->rate_limiter = $rate_limiter;
 
         return $this;
     }
 
-    public function withLogger(LoggerInterface $logger): self
+    public function withLogger(LoggerInterface $logger) : self
     {
         $this->logger = $logger;
 
         return $this;
     }
 
-    public function withLockFactory(LockFactory $lock_factory): self
+    public function withLockFactory(LockFactory $lock_factory) : self
     {
         $this->lock_factory = $lock_factory;
 
         return $this;
     }
 
-    public function withMiddleware(MiddlewareInterface $middleware): self
+    public function withMiddleware(MiddlewareInterface $middleware) : self
     {
         $this->middlewares[] = $middleware;
 
         return $this;
     }
 
-    public function withEventDispatcher(EventDispatcherInterface $dispatcher): self
+    public function withEventDispatcher(EventDispatcherInterface $dispatcher) : self
     {
         $this->dispatcher = $dispatcher;
 
         return $this;
     }
 
-    public function withSerializer(SerializerInterface $serializer): self
+    public function withSerializer(SerializerInterface $serializer) : self
     {
         $this->serializer = $serializer;
 
         return $this;
     }
 
-    public function withClock(ClockInterface $clock): self
+    public function withClock(ClockInterface $clock) : self
     {
         $this->clock = $clock;
 
@@ -106,7 +106,7 @@ final class AsyncCacheConfigBuilder
     /**
      * Builds and returns the AsyncCacheConfig instance.
      */
-    public function build(): AsyncCacheConfig
+    public function build() : AsyncCacheConfig
     {
         return new AsyncCacheConfig(
             $this->cache_adapter,
