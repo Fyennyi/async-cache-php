@@ -18,7 +18,6 @@
         </include>
         <exclude>
             <directory>src/Bridge/Laravel</directory>
-            <directory>src/Bridge/Symfony</directory>
         </exclude>
     </source>
 </phpunit>
