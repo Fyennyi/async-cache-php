@@ -151,6 +151,13 @@ class CacheOptionsBuilder
      *
      * @param  float $beta Beta coefficient (0 to disable)
      * @return self  Current builder instance
+     *
+     * @example
+     *   // Enable X-Fetch with beta 1.5 (probabilistic early refresh)
+     *   $opts = CacheOptionsBuilder::create()->withXFetch(1.5)->build();
+     *
+     * @note
+     *   Higher beta -> more aggressive early refresh; set to 0 to disable.
      */
     public function withXFetch(float $beta = 1.0) : self
     {
@@ -165,6 +172,10 @@ class CacheOptionsBuilder
      * @param  string $key         Identifier for rate limit grouping
      * @param  bool   $serve_stale Whether to return stale data if limited
      * @return self   Current builder instance
+     *
+     * @example
+     *   // Use a shared rate limit bucket for an external API and allow stale on limit
+     *   $opts = CacheOptionsBuilder::create()->withRateLimit('alerts_api', true)->build();
      */
     public function withRateLimit(string $key, bool $serve_stale = true) : self
     {
