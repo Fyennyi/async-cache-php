@@ -30,7 +30,7 @@ use Fyennyi\AsyncCache\Enum\CacheStrategy;
 /**
  * Options DTO for AsyncCache wrapping.
  */
-class CacheOptions
+final class CacheOptions
 {
     /**
      * @param int|null      $ttl                    Logical Time-To-Live in seconds (how long data is considered fresh)
