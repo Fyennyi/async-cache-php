@@ -47,6 +47,9 @@ final class AsyncCacheConfig
     /** @var MiddlewareInterface[] */
     private array $middlewares = [];
 
+    /**
+     * @param array<MiddlewareInterface> $middlewares
+     */
     public function __construct(
         private readonly PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter,
         private readonly ?LimiterInterface $rate_limiter = null,
