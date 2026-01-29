@@ -29,10 +29,6 @@ graph TD
 
     LarBridge -.->|extends| Laravel
     SymBridge -.->|extends| Symfony
-
-    style Core fill:#f96,stroke:#333,stroke-width:2px,color:white
-    style LarBridge fill:#ffced8,stroke:#333,stroke-width:1px
-    style SymBridge fill:#dae8fc,stroke:#333,stroke-width:1px
 ```
 
 ## Integration Details
