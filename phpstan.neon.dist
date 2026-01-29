@@ -7,10 +7,7 @@ parameters:
     excludePaths:
         - tests
         - src/Bridge/*/AsyncCacheServiceProvider.php
-        - src/Bridge/*/AsyncCacheBundle.php
-        - src/Bridge/*/DependencyInjection/*
         - src/Bridge/Laravel/*
-        - src/Bridge/Symfony/*
     reportUnmatchedIgnoredErrors: true
 
     # Typing and strictness
