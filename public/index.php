@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use Fyennyi\AsyncCache\AsyncCacheBuilder;
+use Fyennyi\AsyncCache\AsyncCacheManager;
 use Fyennyi\AsyncCache\CacheOptions;
 use Fyennyi\AsyncCache\Storage\ChainCacheAdapter;
 use React\Http\HttpServer;
@@ -86,15 +86,19 @@ $cache = new MemoryAdapter();
 $dispatcher = new TelemetryDispatcher($tracker);
 
 // 1. Memory Only Manager (for main dashboard)
-$memoryManager = AsyncCacheBuilder::create($cache)
-    ->withEventDispatcher($dispatcher)
-    ->build();
+$memoryManager = new AsyncCacheManager(
+    AsyncCacheManager::configure($cache)
+        ->withEventDispatcher($dispatcher)
+        ->build()
+);
 
 // 2. Chain Manager (Memory + Slow) for benchmark
-$chainManager = AsyncCacheBuilder::create(new ChainCacheAdapter([
-    new MemoryAdapter(),
-    new SlowAdapter()
-]))->build();
+$chainManager = new AsyncCacheManager(
+    AsyncCacheManager::configure(new ChainCacheAdapter([
+        new MemoryAdapter(),
+        new SlowAdapter()
+    ]))->build()
+);
 
 $browser = new Browser();
 $options = new CacheOptions(ttl: 10);
