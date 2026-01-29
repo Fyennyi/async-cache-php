@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use Fyennyi\AsyncCache\AsyncCacheManager;
 use Fyennyi\AsyncCache\CacheOptions;
+use Fyennyi\AsyncCache\Config\AsyncCacheConfig;
 use Fyennyi\AsyncCache\Enum\CacheStrategy;
 use Fyennyi\AsyncCache\Model\CachedItem;
 use Fyennyi\AsyncCache\Storage\AsyncCacheAdapterInterface;
@@ -32,13 +33,14 @@ class AsyncCacheManagerTest extends TestCase
         $this->lockFactory = new LockFactory(new InMemoryStore()); // Use real in-memory locks
         $this->clock = new MockClock();
 
-        $this->manager = new AsyncCacheManager(
-            cache_adapter: $this->cache,
-            rate_limiter: $this->rateLimiter,
-            logger: new NullLogger(),
-            lock_factory: $this->lockFactory,
-            clock: $this->clock
-        );
+        $config = AsyncCacheConfig::builder($this->cache)
+            ->withRateLimiter($this->rateLimiter)
+            ->withLogger(new NullLogger())
+            ->withLockFactory($this->lockFactory)
+            ->withClock($this->clock)
+            ->build();
+
+        $this->manager = new AsyncCacheManager($config);
     }
 
     public function testReturnsFreshCacheImmediately() : void
@@ -128,7 +130,11 @@ class AsyncCacheManagerTest extends TestCase
         $lock->method('acquire')->willReturn(false);
 
         $clock = new MockClock();
-        $mgr = new AsyncCacheManager($adapter, lock_factory: $lockFactory, clock: $clock);
+        $config = AsyncCacheConfig::builder($adapter)
+            ->withLockFactory($lockFactory)
+            ->withClock($clock)
+            ->build();
+        $mgr = new AsyncCacheManager($config);
 
         // Advance clock asynchronously after the first attempt
         \React\EventLoop\Loop::addTimer(0.01, fn () => $clock->sleep(11.0));
@@ -152,7 +158,12 @@ class AsyncCacheManagerTest extends TestCase
             return $item instanceof CachedItem && 11 === $item->data;
         }))->willReturn(true);
 
-        $mgr = new AsyncCacheManager(cache_adapter: $cache, rate_limiter: null, logger: new NullLogger(), lock_factory: $lockFactory, clock: $this->clock);
+        $config = AsyncCacheConfig::builder($cache)
+            ->withLogger(new NullLogger())
+            ->withLockFactory($lockFactory)
+            ->withClock($this->clock)
+            ->build();
+        $mgr = new AsyncCacheManager($config);
         $result = await($mgr->increment($key, 1));
         $this->assertSame(11, $result);
     }
@@ -171,7 +182,12 @@ class AsyncCacheManagerTest extends TestCase
             return $item instanceof CachedItem && 1 === $item->data;
         }))->willReturn(true);
 
-        $mgr = new AsyncCacheManager(cache_adapter: $cache, rate_limiter: null, logger: new NullLogger(), lock_factory: $lockFactory, clock: $this->clock);
+        $config = AsyncCacheConfig::builder($cache)
+            ->withLogger(new NullLogger())
+            ->withLockFactory($lockFactory)
+            ->withClock($this->clock)
+            ->build();
+        $mgr = new AsyncCacheManager($config);
         $result = await($mgr->increment($key));
         $this->assertSame(1, $result);
     }
@@ -190,7 +206,12 @@ class AsyncCacheManagerTest extends TestCase
             return $item instanceof CachedItem && 5 === $item->data;
         }))->willReturn(true);
 
-        $mgr = new AsyncCacheManager(cache_adapter: $cache, rate_limiter: null, logger: new NullLogger(), lock_factory: $lockFactory, clock: $this->clock);
+        $config = AsyncCacheConfig::builder($cache)
+            ->withLogger(new NullLogger())
+            ->withLockFactory($lockFactory)
+            ->withClock($this->clock)
+            ->build();
+        $mgr = new AsyncCacheManager($config);
         $result = await($mgr->decrement($key, 5));
         $this->assertSame(5, $result);
     }
@@ -199,7 +220,12 @@ class AsyncCacheManagerTest extends TestCase
     {
         $cache = $this->createMock(CacheInterface::class);
         $lockFactory = $this->createMock(LockFactory::class);
-        $mgr = new AsyncCacheManager(cache_adapter: $cache, rate_limiter: null, logger: new NullLogger(), lock_factory: $lockFactory, clock: $this->clock);
+        $config = AsyncCacheConfig::builder($cache)
+            ->withLogger(new NullLogger())
+            ->withLockFactory($lockFactory)
+            ->withClock($this->clock)
+            ->build();
+        $mgr = new AsyncCacheManager($config);
 
         $tags = ['tag1','tag2'];
         $cache->expects($this->exactly(2))->method('set')->with($this->stringStartsWith('tag_v:'));
@@ -216,11 +242,13 @@ class AsyncCacheManagerTest extends TestCase
     public function testConstructorWrappers() : void
     {
         $psr = $this->createMock(CacheInterface::class);
-        $mgr = new AsyncCacheManager($psr);
+        $config = AsyncCacheConfig::builder($psr)->build();
+        $mgr = new AsyncCacheManager($config);
         $this->assertInstanceOf(AsyncCacheManager::class, $mgr);
 
         $react = $this->createMock(\React\Cache\CacheInterface::class);
-        $mgr2 = new AsyncCacheManager($react);
+        $config2 = AsyncCacheConfig::builder($react)->build();
+        $mgr2 = new AsyncCacheManager($config2);
         $this->assertInstanceOf(AsyncCacheManager::class, $mgr2);
     }
 
@@ -254,7 +282,11 @@ class AsyncCacheManagerTest extends TestCase
         // Throwing in serialize() will trigger the catch (\Throwable $e) block in increment()
         $serializer->method('serialize')->willThrowException(new \Error('Sync fail'));
 
-        $mgr = new AsyncCacheManager($this->cache, serializer: $serializer, clock: $this->clock);
+        $config = AsyncCacheConfig::builder($this->cache)
+            ->withSerializer($serializer)
+            ->withClock($this->clock)
+            ->build();
+        $mgr = new AsyncCacheManager($config);
         $this->cache->method('get')->willReturn(null);
 
         $this->expectException(\Error::class);
@@ -279,7 +311,11 @@ class AsyncCacheManagerTest extends TestCase
         $this->cache->method('get')->willReturn(null);
         $this->cache->method('set')->willReturn(true);
 
-        $mgr = new AsyncCacheManager($this->cache, lock_factory: $lockFactory, clock: $this->clock);
+        $config = AsyncCacheConfig::builder($this->cache)
+            ->withLockFactory($lockFactory)
+            ->withClock($this->clock)
+            ->build();
+        $mgr = new AsyncCacheManager($config);
 
         $res = await($mgr->increment($key, 1));
         $this->assertSame(1, $res);
