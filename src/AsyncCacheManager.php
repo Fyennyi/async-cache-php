@@ -55,7 +55,7 @@ use function React\Promise\Timer\resolve as delay;
 /**
  * Universal Asynchronous Cache Manager powered by ReactPHP Promises.
  */
-class AsyncCacheManager
+final class AsyncCacheManager
 {
     private Pipeline $pipeline;
     private CacheStorage $storage;
