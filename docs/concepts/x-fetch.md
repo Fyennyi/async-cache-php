@@ -7,6 +7,7 @@ One of the most difficult problems in caching is the **Cache Stampede** (also kn
 **X-Fetch** (Probabilistic Early Recomputation) is an algorithm that randomly refreshes a cache item *before* it actually expires.
 
 Instead of waiting for the hard TTL (Time-To-Live), the system calculates a probabilistic value based on:
+
 1. The time remaining until expiration.
 2. The time it took to generate the value previously (`generation_time`).
 3. A configured beta coefficient (`x_fetch_beta`).
