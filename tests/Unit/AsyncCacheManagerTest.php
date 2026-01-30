@@ -320,4 +320,12 @@ class AsyncCacheManagerTest extends TestCase
         $res = await($mgr->increment($key, 1));
         $this->assertSame(1, $res);
     }
+
+    public function testConfigureStaticMethod() : void
+    {
+        $cache = $this->createMock(CacheInterface::class);
+        $builder = AsyncCacheManager::configure($cache);
+
+        $this->assertInstanceOf(\Fyennyi\AsyncCache\Config\AsyncCacheConfigBuilder::class, $builder);
+    }
 }
