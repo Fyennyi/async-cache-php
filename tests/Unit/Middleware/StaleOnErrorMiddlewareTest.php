@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use React\Promise\Deferred;
 use Symfony\Component\Clock\MockClock;
-use function React\Async\await;
+use function Clue\React\Block\await;
 
 class StaleOnErrorMiddlewareTest extends TestCase
 {

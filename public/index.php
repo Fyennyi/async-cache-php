@@ -10,8 +10,6 @@ use React\Http\Message\Response;
 use React\Socket\SocketServer;
 use Psr\Http\Message\ServerRequestInterface;
 use React\Http\Browser;
-use function React\Async\async;
-use function React\Async\await;
 
 // --- ADAPTERS ---
 
@@ -105,7 +103,7 @@ $options = new CacheOptions(ttl: 10);
 
 // --- SERVER ---
 
-$http = new HttpServer(async(function (ServerRequestInterface $request) use ($memoryManager, $chainManager, $browser, $options, $tracker) {
+$http = new HttpServer(function (ServerRequestInterface $request) use ($memoryManager, $chainManager, $browser, $options, $tracker) {
     $path = $request->getUri()->getPath();
 
     // --- STATIC FILES ---
@@ -125,27 +123,29 @@ $http = new HttpServer(async(function (ServerRequestInterface $request) use ($me
     if ($path === '/api/slow') {
         $start = microtime(true);
         $tracker->lastStatus = null;
-        try {
-            $res = await($memoryManager->wrap('georgia_flag', function() use ($browser) {
-                return $browser->get('https://restcountries.com/v3.1/name/georgia')
-                    ->then(function ($response) {
-                        $data = json_decode((string)$response->getBody(), true);
-                        return $data[0]['flags']['png'] ?? '';
-                    });
-            }, new CacheOptions(ttl: 15)));
+        
+        return $memoryManager->wrap('georgia_flag', function() use ($browser) {
+            return $browser->get('https://restcountries.com/v3.1/name/georgia')
+                ->then(function ($response) {
+                    $data = json_decode((string)$response->getBody(), true);
+                    return $data[0]['flags']['png'] ?? '';
+                });
+        }, new CacheOptions(ttl: 15))->then(
+            function ($res) use ($start, $tracker) {
+                $source = 'fresh';
+                if ($tracker->lastStatus === 'hit') $source = 'cache';
+                if ($tracker->lastStatus === 'stale') $source = 'stale_fallback';
 
-            $source = 'fresh';
-            if ($tracker->lastStatus === 'hit') $source = 'cache';
-            if ($tracker->lastStatus === 'stale') $source = 'stale_fallback';
-
-            return Response::json([
-                'latency' => round(microtime(true) - $start, 4),
-                'data' => $res,
-                'source' => $source
-            ]);
-        } catch (\Throwable $e) {
-            return Response::json(['status' => 'error', 'message' => $e->getMessage()]);
-        }
+                return Response::json([
+                    'latency' => round(microtime(true) - $start, 4),
+                    'data' => $res,
+                    'source' => $source
+                ]);
+            },
+            function (\Throwable $e) {
+                return Response::json(['status' => 'error', 'message' => $e->getMessage()]);
+            }
+        );
     }
 
     // 2. Fast API (immediate response)
@@ -156,29 +156,31 @@ $http = new HttpServer(async(function (ServerRequestInterface $request) use ($me
     // 3. Memory Benchmark
     if ($path === '/api/memory') {
         $start = microtime(true);
-        $res = await($memoryManager->wrap('shared_benchmark', function() use ($browser) {
+        
+        return $memoryManager->wrap('shared_benchmark', function() use ($browser) {
             return $browser->get('https://www.google.com')->then(fn() => "Origin OK");
-        }, $options));
-
-        return Response::json([
-            'latency' => round(microtime(true) - $start, 4),
-            'data' => $res,
-            'type' => 'Memory (L1)'
-        ]);
+        }, $options)->then(function ($res) use ($start) {
+            return Response::json([
+                'latency' => round(microtime(true) - $start, 4),
+                'data' => $res,
+                'type' => 'Memory (L1)'
+            ]);
+        });
     }
 
     // 4. Chain Benchmark (L1 + L2)
     if ($path === '/api/chain') {
         $start = microtime(true);
-        $res = await($chainManager->wrap('shared_benchmark', function() use ($browser) {
+        
+        return $chainManager->wrap('shared_benchmark', function() use ($browser) {
             return $browser->get('https://www.google.com')->then(fn() => "Origin OK");
-        }, $options));
-
-        return Response::json([
-            'latency' => round(microtime(true) - $start, 4),
-            'data' => $res,
-            'type' => 'Chain (L1+L2)'
-        ]);
+        }, $options)->then(function ($res) use ($start) {
+            return Response::json([
+                'latency' => round(microtime(true) - $start, 4),
+                'data' => $res,
+                'type' => 'Chain (L1+L2)'
+            ]);
+        });
     }
 
     // 5. Stats Endpoint for Dashboard
@@ -196,7 +198,7 @@ $http = new HttpServer(async(function (ServerRequestInterface $request) use ($me
     }
 
     return new Response(404, [], 'Not Found');
-}));
+});
 
 $port = (int)(getenv('PORT') ?: 8080);
 $socket = new SocketServer('0.0.0.0:' . $port);

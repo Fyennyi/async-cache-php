@@ -7,7 +7,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use React\Cache\CacheInterface;
 use React\Promise\Promise;
-use function React\Async\await;
+use function Clue\React\Block\await;
 
 class ReactCacheAdapterTest extends TestCase
 {

@@ -9,7 +9,7 @@ use Fyennyi\AsyncCache\Storage\ReactCacheAdapter;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use React\Promise\Deferred;
-use function React\Async\await;
+use function Clue\React\Block\await;
 
 class ChainCacheAdapterTest extends TestCase
 {

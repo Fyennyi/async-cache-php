@@ -16,7 +16,7 @@ use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\InMemoryStore;
 use Symfony\Component\RateLimiter\LimiterInterface;
-use function React\Async\await;
+use function Clue\React\Block\await;
 
 class AsyncCacheManagerTest extends TestCase
 {

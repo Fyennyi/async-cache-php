@@ -6,7 +6,7 @@ use Fyennyi\AsyncCache\Storage\PsrToAsyncAdapter;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\SimpleCache\CacheInterface;
-use function React\Async\await;
+use function Clue\React\Block\await;
 
 class PsrToAsyncAdapterTest extends TestCase
 {

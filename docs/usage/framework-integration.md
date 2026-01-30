@@ -71,7 +71,7 @@ graph TD
             );
 
             // Example for sync retrieval in a traditional FPM environment:
-            return \React\Async\await($promise);
+            return \Clue\React\Block\await($promise);
         }
 
         private function fetchFromApi(string $city) { /* ... */ }

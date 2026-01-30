@@ -12,7 +12,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\MockClock;
-use function React\Async\await;
+use function Clue\React\Block\await;
 
 class CacheLookupMiddlewareTest extends TestCase
 {

@@ -9,7 +9,7 @@ use Fyennyi\AsyncCache\Middleware\MiddlewareInterface;
 use PHPUnit\Framework\TestCase;
 use React\Promise\Deferred;
 use Symfony\Component\Clock\MockClock;
-use function React\Async\await;
+use function Clue\React\Block\await;
 
 class PipelineTest extends TestCase
 {
