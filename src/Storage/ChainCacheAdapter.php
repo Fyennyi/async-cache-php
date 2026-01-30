@@ -39,6 +39,36 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
     private array $adapters = [];
 
     /**
+     * Resolve multiple promises without failing fast.
+     *
+     * @param  array<int, PromiseInterface<mixed>> $promises
+     * @return PromiseInterface<array<int, mixed>>
+     */
+    private function settleAll(array $promises) : PromiseInterface
+    {
+        if (empty($promises)) {
+            /** @var PromiseInterface<array<int, mixed>> $res */
+            $res =
+                \React\Promise\resolve([]);
+
+            return $res;
+        }
+
+        $wrapped = array_map(
+            static fn (PromiseInterface $p) => $p->then(
+                static fn ($v) => ['status' => 'fulfilled', 'value' => $v],
+                static fn ($e) => ['status' => 'rejected', 'reason' => $e]
+            ),
+            $promises
+        );
+
+        /** @var PromiseInterface<array<int, array{status: string, value?: mixed, reason?: mixed}>> $all */
+        $all = all($wrapped);
+
+        return $all;
+    }
+
+    /**
      * @param AsyncCacheAdapterInterface[] $adapters Ordered list of adapters (Psr, React or Async)
      */
     public function __construct(array $adapters)
@@ -115,21 +145,64 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
             return $res;
         }
 
-        /** @var array<int, PromiseInterface<mixed>> $promises */
-        $promises = [];
-        foreach ($keys_array as $key) {
-            $promises[] = $this->get($key);
+        return $this->resolveLayerMultiple($keys_array, 0);
+    }
+
+    /**
+     * Resolves multiple keys across layers with fallback and backfill.
+     *
+     * @param  string[]                               $keys
+     * @param  int                                    $index
+     * @return PromiseInterface<array<string, mixed>>
+     */
+    private function resolveLayerMultiple(array $keys, int $index) : PromiseInterface
+    {
+        if (! isset($this->adapters[$index])) {
+            /** @var array<string, mixed> $empty */
+            $empty = [];
+            /** @var PromiseInterface<array<string, mixed>> $res */
+            $res = \React\Promise\resolve($empty);
+
+            return $res;
         }
 
-        /** @var PromiseInterface<array<string, mixed>> $all_promise */
-        $all_promise = all($promises)->then(function (array $results) use ($keys_array) {
-            /** @var array<string, mixed> $combined */
-            $combined = array_combine($keys_array, $results);
+        return $this->adapters[$index]->getMultiple($keys)->then(
+            function (iterable $results) use ($keys, $index) {
+                /** @var array<string, mixed> $result_map */
+                $result_map = is_array($results) ? $results : iterator_to_array($results);
 
-            return $combined;
-        });
+                $hits = [];
+                $misses = [];
 
-        return $all_promise;
+                foreach ($keys as $key) {
+                    if (array_key_exists($key, $result_map) && null !== $result_map[$key]) {
+                        $hits[$key] = $result_map[$key];
+                    } else {
+                        $misses[] = $key;
+                    }
+                }
+
+                if (! empty($hits)) {
+                    // Backfill upper layers with any hits (best-effort)
+                    for ($i = 0; $i < $index && isset($this->adapters[$i]); $i++) {
+                        foreach ($hits as $key => $value) {
+                            $this->adapters[$i]->set($key, $value);
+                        }
+                    }
+                }
+
+                if (empty($misses)) {
+                    return $hits;
+                }
+
+                return $this->resolveLayerMultiple($misses, $index + 1)->then(function (array $lower) use ($hits) {
+                    return $hits + $lower;
+                });
+            },
+            function () use ($keys, $index) {
+                return $this->resolveLayerMultiple($keys, $index + 1);
+            }
+        );
     }
 
     /**
@@ -148,7 +221,7 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
             $promises[] = $adapter->set($key, $value, $ttl);
         }
 
-        return all($promises)->then(fn () => true);
+        return $this->settleAll($promises)->then(fn () => true);
     }
 
     /**
@@ -167,7 +240,7 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
             $promises[] = $adapter->delete($key);
         }
 
-        return all($promises)->then(fn () => true);
+        return $this->settleAll($promises)->then(fn () => true);
     }
 
     /**
@@ -186,6 +259,6 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
             $promises[] = $adapter->clear();
         }
 
-        return all($promises)->then(fn () => true);
+        return $this->settleAll($promises)->then(fn () => true);
     }
 }
