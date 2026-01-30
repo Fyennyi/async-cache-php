@@ -113,6 +113,42 @@ $manager->increment('page_views', 1)->then(function($newValue) {
    - **Background**: Returns stale data immediately and triggers an asynchronous refresh in the background.
 4. **X-Fetch**: Helps avoid simultaneous cache misses for the same key by probabilistic early recomputation.
 
+## Blocking vs Async Operations
+
+This library is built on [ReactPHP](https://reactphp.org/) promises, providing both **async** (non-blocking) and **blocking** modes:
+
+### Async Mode (Recommended)
+
+For long-running applications and async servers, use promise chains:
+
+```php
+$manager->wrap($key, $factory, $options)->then(
+    function ($result) {
+        echo "Data: " . $result;
+    },
+    function ($error) {
+        echo "Error: " . $error->getMessage();
+    }
+);
+```
+
+### Blocking Mode (Tests & Traditional PHP)
+
+For unit tests and traditional PHP-FPM applications, use `await()` from [`clue/block-react`](https://github.com/clue/reactphp-block):
+
+```php
+use function Clue\React\Block\await;
+
+try {
+    $result = await($manager->wrap($key, $factory, $options));
+    echo "Data: " . $result;
+} catch (\Throwable $e) {
+    echo "Error: " . $e->getMessage();
+}
+```
+
+The `await()` function blocks execution until the promise resolves, making it perfect for synchronous contexts while still leveraging async cache operations.
+
 ## Contributing
 
 Contributions are welcome! Please follow these steps:
