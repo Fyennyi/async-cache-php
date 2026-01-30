@@ -42,12 +42,15 @@ class CacheOptionsBuilderTest extends TestCase
         $this->assertSame(CacheStrategy::Strict, $options->strategy);
     }
 
-    public function testStrategyHelpers() : void
+    public function testWithStrategy() : void
     {
-        $options1 = CacheOptionsBuilder::create()->withBackgroundRefresh()->build();
+        $options1 = CacheOptionsBuilder::create()->withStrategy(CacheStrategy::Background)->build();
         $this->assertSame(CacheStrategy::Background, $options1->strategy);
 
-        $options2 = CacheOptionsBuilder::create()->withForceRefresh()->build();
+        $options2 = CacheOptionsBuilder::create()->withStrategy(CacheStrategy::ForceRefresh)->build();
         $this->assertSame(CacheStrategy::ForceRefresh, $options2->strategy);
+
+        $options3 = CacheOptionsBuilder::create()->withStrategy(CacheStrategy::Strict)->build();
+        $this->assertSame(CacheStrategy::Strict, $options3->strategy);
     }
 }
