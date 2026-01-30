@@ -1,5 +1,37 @@
 # Blocking Operations with clue/block-react
 
+## ⚠️ CRITICAL DEPRECATION WARNING
+
+**DO NOT USE THIS APPROACH** - This documentation describes using `clue/block-react`, which is **DEPRECATED**.
+
+### The Issue
+
+`clue/block-react` has been **migrated to `react/async`** and only exists for backward compatibility. Using this package means using a deprecated legacy library instead of the modern, actively maintained one.
+
+**From the official deprecation notice:**
+> "This package has now been migrated over to [reactphp/async](https://github.com/reactphp/async) and only exists for BC reasons."
+
+### The Correct Approach
+
+Instead of `clue/block-react`, use `react/async`:
+
+```php
+// ❌ WRONG (deprecated)
+use function Clue\React\Block\await;
+
+// ✅ CORRECT (current)
+use function React\Async\await;
+```
+
+**See `DEPRECATION_WARNING.md` for full details on why this branch should not be used.**
+
+---
+
+# Original Documentation (Using Deprecated Package)
+
+> **Note**: The following documentation uses the deprecated `clue/block-react` package.  
+> For production use, replace `Clue\React\Block\await` with `React\Async\await`.
+
 ## Overview
 
 This library is built on ReactPHP promises, which are inherently asynchronous and non-blocking. However, there are scenarios where you need to integrate async operations into synchronous (blocking) code. This is where `clue/block-react` comes in.

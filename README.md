@@ -115,6 +115,9 @@ $manager->increment('page_views', 1)->then(function($newValue) {
 
 ## Blocking vs Async Operations
 
+> **⚠️ IMPORTANT**: This section uses `clue/block-react` which is **DEPRECATED**.  
+> The original code using `react/async` was correct. See `DEPRECATION_WARNING.md`.
+
 This library is built on [ReactPHP](https://reactphp.org/) promises, providing both **async** (non-blocking) and **blocking** modes:
 
 ### Async Mode (Recommended)
@@ -134,9 +137,13 @@ $manager->wrap($key, $factory, $options)->then(
 
 ### Blocking Mode (Tests & Traditional PHP)
 
-For unit tests and traditional PHP-FPM applications, use `await()` from [`clue/block-react`](https://github.com/clue/reactphp-block):
+For unit tests and traditional PHP-FPM applications, use `await()`:
 
 ```php
+// ✅ MODERN (react/async - use this)
+use function React\Async\await;
+
+// ❌ DEPRECATED (clue/block-react - this branch uses this)
 use function Clue\React\Block\await;
 
 try {
@@ -147,7 +154,7 @@ try {
 }
 ```
 
-The `await()` function blocks execution until the promise resolves, making it perfect for synchronous contexts while still leveraging async cache operations.
+**Note**: This branch incorrectly uses the deprecated `clue/block-react`. The correct modern package is `react/async`.
 
 ## Contributing
 
