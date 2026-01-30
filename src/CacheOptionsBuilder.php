@@ -122,7 +122,6 @@ class CacheOptionsBuilder
     }
 
     /**
-     * /
      * Configures X-Fetch probabilistic early expiration.
      *
      * @param  float $beta Beta coefficient (0 to disable)
