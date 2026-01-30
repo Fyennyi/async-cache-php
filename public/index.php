@@ -126,6 +126,8 @@ class SlowAdapter implements \Psr\SimpleCache\CacheInterface
 class StatusTracker
 {
     public ?string $lastStatus = null;
+    public int $hits = 0;
+    public int $misses = 0;
 }
 $tracker = new StatusTracker();
 
@@ -136,6 +138,16 @@ class EventTracker implements \Psr\EventDispatcher\EventDispatcherInterface
     {
         if ($event instanceof \Fyennyi\AsyncCache\Event\CacheStatusEvent) {
             $this->tracker->lastStatus = $event->status->value;
+            // Hit, Stale, XFetch = cache hits; Miss = cache miss
+            if (in_array($event->status, [
+                \Fyennyi\AsyncCache\Enum\CacheStatus::Hit,
+                \Fyennyi\AsyncCache\Enum\CacheStatus::Stale,
+                \Fyennyi\AsyncCache\Enum\CacheStatus::XFetch,
+            ], true)) {
+                $this->tracker->hits++;
+            } elseif ($event->status === \Fyennyi\AsyncCache\Enum\CacheStatus::Miss) {
+                $this->tracker->misses++;
+            }
         }
         return $event;
     }
