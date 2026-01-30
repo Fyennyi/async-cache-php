@@ -41,17 +41,13 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
     /**
      * Resolve multiple promises without failing fast.
      *
-     * @param  array<int, PromiseInterface<mixed>> $promises
-     * @return PromiseInterface<array<int, mixed>>
+     * @param  array<int, PromiseInterface<mixed>>                                                $promises
+     * @return PromiseInterface<array<array{status: string, value?: mixed, reason?: \Throwable}>>
      */
     private function settleAll(array $promises) : PromiseInterface
     {
         if (empty($promises)) {
-            /** @var PromiseInterface<array<int, mixed>> $res */
-            $res =
-                \React\Promise\resolve([]);
-
-            return $res;
+            return \React\Promise\resolve([]);
         }
 
         $wrapped = array_map(
@@ -62,10 +58,7 @@ class ChainCacheAdapter implements AsyncCacheAdapterInterface
             $promises
         );
 
-        /** @var PromiseInterface<array<int, array{status: string, value?: mixed, reason?: mixed}>> $all */
-        $all = all($wrapped);
-
-        return $all;
+        return all($wrapped);
     }
 
     /**
