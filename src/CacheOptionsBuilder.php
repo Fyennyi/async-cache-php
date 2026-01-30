@@ -94,30 +94,6 @@ class CacheOptionsBuilder
     }
 
     /**
-     * Enables background revalidation strategy.
-     *
-     * @return self Current builder instance
-     */
-    public function withBackgroundRefresh() : self
-    {
-        $this->strategy = CacheStrategy::Background;
-
-        return $this;
-    }
-
-    /**
-     * Enables force refresh strategy (bypass cache).
-     *
-     * @return self Current builder instance
-     */
-    public function withForceRefresh() : self
-    {
-        $this->strategy = CacheStrategy::ForceRefresh;
-
-        return $this;
-    }
-
-    /**
      * Configures data compression.
      *
      * @param  bool $enabled   Whether to enable compression
