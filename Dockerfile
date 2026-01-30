@@ -1,8 +1,10 @@
 # Use PHP 8.2 CLI on Alpine Linux for a minimal and secure base image
 FROM php:8.2-cli-alpine
 
-# Install git and unzip which are required by Composer to fetch some packages
-RUN apk add --no-cache git unzip
+# Install git, unzip and PHP extensions requirements (sysvsem for locks, pcntl for async)
+# We add $PHPIZE_DEPS to compile extensions and remove it later to keep image small
+RUN apk add --no-cache git unzip $PHPIZE_DEPS \
+    && docker-php-ext-install sysvsem pcntl
 
 # Import the Composer binary from the official image to manage PHP dependencies
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
