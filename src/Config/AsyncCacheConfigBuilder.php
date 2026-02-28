@@ -34,14 +34,14 @@ use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface as PsrCacheInterface;
 use React\Cache\CacheInterface as ReactCacheInterface;
 use Symfony\Component\Lock\LockFactory;
-use Symfony\Component\RateLimiter\LimiterInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
 /**
  * Fluent builder for AsyncCacheConfig.
  */
 final class AsyncCacheConfigBuilder
 {
-    private ?LimiterInterface $rate_limiter = null;
+    private ?RateLimiterFactoryInterface $rate_limiter = null;
     private ?LoggerInterface $logger = null;
     private ?LockFactory $lock_factory = null;
     /** @var MiddlewareInterface[] */
@@ -54,7 +54,7 @@ final class AsyncCacheConfigBuilder
         private readonly PsrCacheInterface|ReactCacheInterface|AsyncCacheAdapterInterface $cache_adapter
     ) {}
 
-    public function withRateLimiter(LimiterInterface $rate_limiter) : self
+    public function withRateLimiter(RateLimiterFactoryInterface $rate_limiter) : self
     {
         $this->rate_limiter = $rate_limiter;
 

@@ -61,41 +61,49 @@ class TagValidationMiddleware implements MiddlewareInterface
             return $next($context);
         }
 
+        $this->logger->debug('AsyncCache TAG_VALIDATION_START: Validating tags', ['key' => $context->key, 'tags' => array_keys($item->tag_versions)]);
+
         $tags = array_map('strval', array_keys($item->tag_versions));
 
         /** @var PromiseInterface<array<string, string>> $versions_promise */
         $versions_promise = $this->storage->fetchTagVersions($tags);
 
-        return $versions_promise->then(function (array $current_versions) use ($context, $item, $next) {
-            /** @var array<string, string> $tag_versions */
-            $tag_versions = $item->tag_versions;
-            foreach ($tag_versions as $tag => $saved_version) {
-                if (($current_versions[$tag] ?? null) !== $saved_version) {
-                    $this->logger->debug('AsyncCache TAG_INVALID: Version mismatch for tag {tag} in key {key}', [
-                        'key' => $context->key,
-                        'tag' => $tag
-                    ]);
-                    $context->stale_item = null;
+        return $versions_promise->then(
+            function (array $current_versions) use ($context, $item, $next) {
+                foreach ($item->tag_versions as $tag => $saved_version) {
+                    if (($current_versions[$tag] ?? null) !== $saved_version) {
+                        $this->logger->debug('AsyncCache TAG_INVALID: Version mismatch for tag', [
+                            'key' => $context->key,
+                            'tag' => $tag,
+                            'saved' => $saved_version,
+                            'current' => $current_versions[$tag] ?? 'null',
+                        ]);
+                        $context->stale_item = null;
 
-                    return $next($context);
+                        return $next($context);
+                    }
                 }
+
+                $this->logger->debug('AsyncCache TAG_VALID: All tags are valid', ['key' => $context->key]);
+
+                // Tags are valid. If the item is fresh, we can short-circuit and return it.
+                if ($item->isFresh($context->clock->now()->getTimestamp())) {
+                    /** @var T $item_data */
+                    $item_data = $item->data;
+
+                    return \React\Promise\resolve($item_data);
+                }
+
+                // Item is stale but tags are valid, continue to StrategyMiddleware
+                return $next($context);
+            },
+            function (\Throwable $e) use ($context, $next) {
+                $this->logger->error('AsyncCache TAG_FETCH_ERROR: Failed to fetch tag versions', ['key' => $context->key, 'error' => $e->getMessage()]);
+                // On tag fetch error, we conservatively treat as stale/invalid
+                $context->stale_item = null;
+
+                return $next($context);
             }
-
-            // Tags are valid. If the item is fresh, we can return it now.
-            if ($item->isFresh()) {
-                /** @var T $item_data */
-                $item_data = $item->data;
-
-                return \React\Promise\resolve($item_data);
-            }
-
-            return $next($context);
-        }, function (\Throwable $e) use ($context, $next) {
-            $this->logger->error('AsyncCache TAG_FETCH_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
-            // On tag fetch error, we conservatively treat as stale/invalid
-            $context->stale_item = null;
-
-            return $next($context);
-        });
+        );
     }
 }

@@ -27,7 +27,6 @@ namespace Fyennyi\AsyncCache\Middleware;
 
 use Fyennyi\AsyncCache\Core\CacheContext;
 use Fyennyi\AsyncCache\Enum\CacheStatus;
-use Fyennyi\AsyncCache\Event\CacheMissEvent;
 use Fyennyi\AsyncCache\Event\CacheStatusEvent;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
 use Psr\EventDispatcher\EventDispatcherInterface;
@@ -54,8 +53,7 @@ class SourceFetchMiddleware implements MiddlewareInterface
      */
     public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
-        $this->logger->debug('AsyncCache MISS: fetching from source', ['key' => $context->key]);
-        $this->dispatcher?->dispatch(new CacheMissEvent($context->key, (float) $context->clock->now()->format('U.u')));
+        $this->logger->debug('AsyncCache SOURCE_FETCH: Fetching fresh data from source', ['key' => $context->key]);
 
         $start = (float) $context->clock->now()->format('U.u');
 
@@ -65,27 +63,45 @@ class SourceFetchMiddleware implements MiddlewareInterface
 
             /** @var PromiseInterface<T> $result */
             $result = $promise->then(
-                /** @param T $data */
+                /**
+                 * @param  T $data
+                 * @return T
+                 */
                 function ($data) use ($context, $start) {
                     $now = (float) $context->clock->now()->format('U.u');
                     $generation_time = $now - $start;
+
+                    $this->logger->debug('AsyncCache SOURCE_FETCH_SUCCESS: Successfully fetched from source', [
+                        'key' => $context->key,
+                        'generation_time' => round($generation_time, 4),
+                    ]);
+
                     $this->dispatcher?->dispatch(new CacheStatusEvent(
                         $context->key,
                         CacheStatus::Miss,
-                        $now - $context->start_time,
+                        $context->getElapsedTime(),
                         $context->options->tags,
                         $now
                     ));
 
                     // Background persistence - handle errors to avoid breaking the response
-                    $this->storage->set($context->key, $data, $context->options, $generation_time)->catch(function (\Throwable $e) use ($context) {
-                        $this->logger->error('AsyncCache PERSISTENCE_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
-                    });
+                    $this->storage->set($context->key, $data, $context->options, $generation_time)->catch(
+                        function (\Throwable $e) use ($context) {
+                            $this->logger->error('AsyncCache PERSISTENCE_ERROR: Failed to save fresh data to cache', [
+                                'key' => $context->key,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    );
 
                     return $data;
                 }
-            )->catch(function (\Throwable $e) use ($context) : never {
-                $this->logger->debug('AsyncCache FETCH_PIPELINE_ERROR: {msg}', ['key' => $context->key, 'msg' => $e->getMessage()]);
+            )->catch(function (\Throwable $e) use ($context) {
+                $this->logger->debug('AsyncCache SOURCE_FETCH_ERROR: Pipeline execution failed', [
+                    'key' => $context->key,
+                    'error' => $e->getMessage(),
+                ]);
+
                 throw $e;
             });
 

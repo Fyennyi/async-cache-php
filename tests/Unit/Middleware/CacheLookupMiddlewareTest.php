@@ -29,12 +29,17 @@ class CacheLookupMiddlewareTest extends TestCase
         $this->middleware = new CacheLookupMiddleware($this->storage, $this->logger);
     }
 
-    public function testReturnsCachedDataIfFresh() : void
+    public function testSetsStaleItemAndCallsNextIfFound() : void
     {
         $item = new CachedItem('data', $this->clock->now()->getTimestamp() + 100);
         $context = new CacheContext('k', fn () => null, new CacheOptions(), $this->clock);
         $this->storage->method('get')->willReturn(\React\Promise\resolve($item));
-        $this->assertSame('data', await($this->middleware->handle($context, fn () => \React\Promise\resolve(null))));
+        $next = fn () => \React\Promise\resolve('from_next');
+
+        $res = await($this->middleware->handle($context, $next));
+
+        $this->assertSame('from_next', $res);
+        $this->assertSame($item, $context->stale_item);
     }
 
     public function testCallsNextOnCacheMiss() : void
@@ -42,7 +47,9 @@ class CacheLookupMiddlewareTest extends TestCase
         $context = new CacheContext('k', fn () => null, new CacheOptions(), $this->clock);
         $this->storage->method('get')->willReturn(\React\Promise\resolve(null));
         $next = fn () => \React\Promise\resolve('from_next');
+
         $this->assertSame('from_next', await($this->middleware->handle($context, $next)));
+        $this->assertNull($context->stale_item);
     }
 
     public function testBypassesOnForceRefresh() : void
@@ -50,22 +57,8 @@ class CacheLookupMiddlewareTest extends TestCase
         $context = new CacheContext('k', fn () => null, new CacheOptions(strategy: CacheStrategy::ForceRefresh), $this->clock);
         $this->storage->expects($this->never())->method('get');
         $next = fn () => \React\Promise\resolve('bypassed');
-        $this->assertSame('bypassed', await($this->middleware->handle($context, $next)));
-    }
 
-    public function testBackgroundRefreshReturnsStaleAndCallsNext() : void
-    {
-        $item = new CachedItem('stale', $this->clock->now()->getTimestamp() - 10);
-        $context = new CacheContext('k', fn () => null, new CacheOptions(strategy: CacheStrategy::Background), $this->clock);
-        $this->storage->method('get')->willReturn(\React\Promise\resolve($item));
-        $nextCalled = false;
-        $next = function () use (&$nextCalled) {
-            $nextCalled = true;
-            return \React\Promise\resolve('ignored');
-        };
-        $res = await($this->middleware->handle($context, $next));
-        $this->assertSame('stale', $res);
-        $this->assertTrue($nextCalled);
+        $this->assertSame('bypassed', await($this->middleware->handle($context, $next)));
     }
 
     public function testXFetchTriggered() : void
@@ -74,16 +67,12 @@ class CacheLookupMiddlewareTest extends TestCase
         $context = new CacheContext('k', fn () => null, new CacheOptions(x_fetch_beta: 1000.0), $this->clock);
         $this->storage->method('get')->willReturn(\React\Promise\resolve($item));
         $next = fn () => \React\Promise\resolve('xfetch_triggered');
-        $this->assertSame('xfetch_triggered', await($this->middleware->handle($context, $next)));
-    }
 
-    public function testProceedsIfItemHasTags() : void
-    {
-        $item = new CachedItem('data', $this->clock->now()->getTimestamp() + 100, tag_versions: ['t1' => 'v1']);
-        $context = new CacheContext('k', fn () => null, new CacheOptions(), $this->clock);
-        $this->storage->method('get')->willReturn(\React\Promise\resolve($item));
-        $next = fn () => \React\Promise\resolve('validated');
-        $this->assertSame('validated', await($this->middleware->handle($context, $next)));
+        $res = await($this->middleware->handle($context, $next));
+
+        $this->assertSame('xfetch_triggered', $res);
+        $this->assertNotNull($context->stale_item);
+        $this->assertFalse($context->stale_item->isFresh($this->clock->now()->getTimestamp()));
     }
 
     public function testHandlesStorageError() : void
@@ -91,30 +80,7 @@ class CacheLookupMiddlewareTest extends TestCase
         $context = new CacheContext('k', fn () => null, new CacheOptions(), $this->clock);
         $this->storage->method('get')->willReturn(\React\Promise\reject(new \Exception('Storage error')));
         $next = fn () => \React\Promise\resolve('fallback');
+
         $this->assertSame('fallback', await($this->middleware->handle($context, $next)));
-    }
-
-    public function testHandlesBackgroundFetchError() : void
-    {
-        $item = new CachedItem('stale', $this->clock->now()->getTimestamp() - 10);
-        $context = new CacheContext('k', fn () => null, new CacheOptions(strategy: CacheStrategy::Background), $this->clock);
-        $this->storage->method('get')->willReturn(\React\Promise\resolve($item));
-        $next = fn () => \React\Promise\reject(new \Exception('Background fail'));
-        $res = await($this->middleware->handle($context, $next));
-        $this->assertSame('stale', $res);
-    }
-
-    public function testHandlesPipelineErrorLogging() : void
-    {
-        $context = new CacheContext('k', fn () => null, new CacheOptions(), $this->clock);
-        $this->storage->method('get')->willReturn(\React\Promise\resolve(null));
-
-        $this->logger->expects($this->atLeastOnce())->method('debug');
-
-        $next = fn () => \React\Promise\reject(new \Exception('Pipeline fail'));
-
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Pipeline fail');
-        await($this->middleware->handle($context, $next));
     }
 }

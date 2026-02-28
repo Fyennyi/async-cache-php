@@ -39,12 +39,18 @@ Clears the entire cache storage.
 #### `delete(string $key): PromiseInterface`
 Deletes a specific item from the cache.
 
+#### `resetRateLimit(string $key): void`
+Resets the rate limit for a specific key.
+
+#### `getRateLimiter(): ?RateLimiterFactoryInterface`
+Returns the rate limiter factory instance.
+
 ## `AsyncCacheConfigBuilder`
 
 Fluent builder for configuring the manager.
 
-### `withRateLimiter(LimiterInterface $rate_limiter): self`
-Configures a Symfony Rate Limiter.
+### `withRateLimiter(RateLimiterFactoryInterface $rate_limiter): self`
+Configures a Symfony Rate Limiter factory.
 
 ### `withLogger(LoggerInterface $logger): self`
 Sets a PSR-3 logger.
