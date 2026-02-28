@@ -232,6 +232,11 @@ class AsyncCacheManagerTest extends TestCase
         $this->assertTrue(await($mgr->invalidateTags($tags)));
     }
 
+    public function testGetRateLimiter() : void
+    {
+        $this->assertSame($this->rateLimiter, $this->manager->getRateLimiter());
+    }
+
     public function testResetRateLimit() : void
     {
         $key = 'api_limit_key';
