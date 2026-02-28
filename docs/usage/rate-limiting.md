@@ -4,7 +4,7 @@ The library integrates with **Symfony Rate Limiter** to manage how often the dat
 
 ## Integration
 
-Instead of implementing a custom interface, you can use any implementation of `Symfony\Component\RateLimiter\LimiterInterface`.
+The library uses `Symfony\Component\RateLimiter\RateLimiterFactoryInterface`. This allows the manager to create specific limiters dynamically based on the `rate_limit_key` provided in the options.
 
 ### Example with Symfony Rate Limiter
 
@@ -19,11 +19,10 @@ $factory = new RateLimiterFactory([
     'rate' => ['interval' => '10 seconds'],
 ], new InMemoryStorage());
 
-$limiter = $factory->create();
-
+// Pass the factory, not a specific limiter
 $manager = new AsyncCacheManager(
     AsyncCacheManager::configure($cache)
-        ->withRateLimiter($limiter)
+        ->withRateLimiter($factory)
         ->build()
 );
 ```
@@ -32,11 +31,20 @@ $manager = new AsyncCacheManager(
 
 When a cache item is stale and a refresh is needed:
 1. The manager checks if a `rate_limit_key` is provided in `CacheOptions`.
-2. It calls `$limiter->consume(1)`.
-3. If **Accepted**: The factory function is called to fetch fresh data.
-4. If **Rejected**: 
-    - If `serve_stale_if_limited` is **true** and stale data exists, the stale data is returned.
+2. It uses the factory to create/get a limiter for that key: `$factory->create($rate_limit_key)`.
+3. It calls `->consume(1)` on that limiter.
+4. If **Accepted**: The pipeline continues to fetch fresh data.
+5. If **Rejected**: 
+    - If `serve_stale_if_limited` is **true** and stale data exists in the context, the stale data is returned immediately.
     - Otherwise, a `RateLimitException` is thrown.
+
+## Manual Reset
+
+If you need to manually reset the limit for a specific key (e.g. after an administrative action), use the manager:
+
+```php
+$manager->resetRateLimit('user_123');
+```
 
 ## Benefit of Symfony Integration
 

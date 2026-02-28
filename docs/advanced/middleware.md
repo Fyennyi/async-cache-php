@@ -7,11 +7,13 @@ The logic of Async Cache PHP is built on a **Middleware Pipeline**. Every reques
 When you create a manager using `AsyncCacheManager::configure()`, the following middleware stack is assembled (in order):
 
 1. **`CoalesceMiddleware`**: Prevents duplicate requests for the same key happening at the same time. If 10 requests come in for `key_A`, only one factory is executed, and the result is shared.
-2. **`StaleOnErrorMiddleware`**: If the factory fails (throws an exception), this middleware tries to return stale data from the cache instead of propagating the error.
-3. **`CacheLookupMiddleware`**: Checks if the item is in the cache. Handles `CacheStrategy` logic (Strict vs Background) and X-Fetch calculations.
-4. **`TagValidationMiddleware`**: Validates cache tags and handles tag-based invalidation.
-5. **`AsyncLockMiddleware`**: Acquires a lock before calling the factory to ensure only one process generates the data (Cache Stampede protection via locking).
-6. **`SourceFetchMiddleware`**: The final handler. It executes the user's factory function and saves the result to the storage.
+2. **`CacheLookupMiddleware`**: Fetches the item from the storage and populates the context with the cached data (if any). It also handles X-Fetch calculations.
+3. **`TagValidationMiddleware`**: Validates cache tags and handles tag-based invalidation. It can short-circuit if the item is fresh and tags are valid.
+4. **`StrategyMiddleware`**: **The decision maker.** It determines whether to return fresh data, return stale data immediately (Background strategy), or wait for a refresh (Strict strategy).
+5. **`RateLimitMiddleware`**: Enforces rate limiting. If limited, it can fall back to stale data if `serve_stale_if_limited` is enabled.
+6. **`AsyncLockMiddleware`**: Acquires an asynchronous lock to prevent Cache Stampedes. It also performs a "Double-Check" after acquiring the lock to see if the cache was already populated.
+7. **`StaleOnErrorMiddleware`**: Catches exceptions from the source fetch and returns stale data as a fallback.
+8. **`SourceFetchMiddleware`**: The final handler. It executes the user's factory function and saves the result to the storage.
 
 ## Additional Middleware
 
