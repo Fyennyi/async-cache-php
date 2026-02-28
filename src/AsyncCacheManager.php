@@ -321,4 +321,14 @@ final class AsyncCacheManager
     {
         // No-op for factory.
     }
+
+    /**
+     * Resets the rate limit for a specific key.
+     *
+     * @param string $key The rate limit key to reset
+     */
+    public function resetRateLimit(string $key) : void
+    {
+        $this->rate_limiter?->create($key)->reset();
+    }
 }
