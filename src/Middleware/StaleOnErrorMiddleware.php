@@ -64,7 +64,7 @@ class StaleOnErrorMiddleware implements MiddlewareInterface
         return $next($context)->catch(
             function (\Throwable $error) use ($context) {
                 if (null !== $context->stale_item) {
-                    $this->logger->warning('STALE_ON_ERROR: Fetch failed, serving stale data as fallback', [
+                    $this->logger->warning('AsyncCache STALE_ON_ERROR: Fetch failed, serving stale data as fallback', [
                         'key' => $context->key,
                         'error' => $error->getMessage(),
                     ]);
@@ -84,7 +84,7 @@ class StaleOnErrorMiddleware implements MiddlewareInterface
                     return $stale_data;
                 }
 
-                $this->logger->error('FETCH_ERROR: Fetch failed and no stale data available', [
+                $this->logger->error('AsyncCache FETCH_ERROR: Fetch failed and no stale data available', [
                     'key' => $context->key,
                     'error' => $error->getMessage(),
                 ]);

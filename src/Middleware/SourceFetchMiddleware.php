@@ -54,7 +54,7 @@ class SourceFetchMiddleware implements MiddlewareInterface
      */
     public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
-        $this->logger->debug('SOURCE_FETCH: Fetching fresh data from source', ['key' => $context->key]);
+        $this->logger->debug('AsyncCache SOURCE_FETCH: Fetching fresh data from source', ['key' => $context->key]);
 
         $start = (float) $context->clock->now()->format('U.u');
 
@@ -72,7 +72,7 @@ class SourceFetchMiddleware implements MiddlewareInterface
                     $now = (float) $context->clock->now()->format('U.u');
                     $generation_time = $now - $start;
 
-                    $this->logger->debug('SOURCE_FETCH_SUCCESS: Successfully fetched from source', [
+                    $this->logger->debug('AsyncCache SOURCE_FETCH_SUCCESS: Successfully fetched from source', [
                         'key' => $context->key,
                         'generation_time' => round($generation_time, 4),
                     ]);
@@ -88,7 +88,7 @@ class SourceFetchMiddleware implements MiddlewareInterface
                     // Background persistence - handle errors to avoid breaking the response
                     $this->storage->set($context->key, $data, $context->options, $generation_time)->catch(
                         function (\Throwable $e) use ($context) {
-                            $this->logger->error('PERSISTENCE_ERROR: Failed to save fresh data to cache', [
+                            $this->logger->error('AsyncCache PERSISTENCE_ERROR: Failed to save fresh data to cache', [
                                 'key' => $context->key,
                                 'error' => $e->getMessage(),
                             ]);
@@ -98,7 +98,7 @@ class SourceFetchMiddleware implements MiddlewareInterface
                     return $data;
                 }
             )->catch(function (\Throwable $e) use ($context) {
-                $this->logger->debug('SOURCE_FETCH_ERROR: Pipeline execution failed', [
+                $this->logger->debug('AsyncCache SOURCE_FETCH_ERROR: Pipeline execution failed', [
                     'key' => $context->key,
                     'error' => $e->getMessage(),
                 ]);

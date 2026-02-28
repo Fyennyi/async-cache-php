@@ -62,7 +62,7 @@ class StrategyMiddleware implements MiddlewareInterface
         $stale_item = $context->stale_item;
 
         if (null === $stale_item) {
-            $this->logger->debug('STRATEGY_MISS: No cached item found, proceeding to fetch', ['key' => $context->key]);
+            $this->logger->debug('AsyncCache STRATEGY_MISS: No cached item found, proceeding to fetch', ['key' => $context->key]);
 
             return $next($context);
         }
@@ -71,7 +71,7 @@ class StrategyMiddleware implements MiddlewareInterface
         $is_fresh = $stale_item->isFresh($now_ts);
 
         if ($is_fresh) {
-            $this->logger->debug('STRATEGY_HIT: Item is fresh, returning from cache', ['key' => $context->key]);
+            $this->logger->debug('AsyncCache STRATEGY_HIT: Item is fresh, returning from cache', ['key' => $context->key]);
             $this->dispatchHit($context, $stale_item->data);
 
             /** @var T $data */
@@ -81,13 +81,13 @@ class StrategyMiddleware implements MiddlewareInterface
         }
 
         if (CacheStrategy::Background === $context->options->strategy) {
-            $this->logger->debug('STRATEGY_BACKGROUND: Item is stale, returning stale and refreshing in background', ['key' => $context->key]);
+            $this->logger->debug('AsyncCache STRATEGY_BACKGROUND: Item is stale, returning stale and refreshing in background', ['key' => $context->key]);
             $this->dispatchStatus($context, CacheStatus::Stale);
             $this->dispatchHit($context, $stale_item->data);
 
             // Fire-and-forget background refresh
             $next($context)->catch(function (\Throwable $e) use ($context) {
-                $this->logger->error('STRATEGY_BACKGROUND_ERROR: Background refresh failed', [
+                $this->logger->error('AsyncCache STRATEGY_BACKGROUND_ERROR: Background refresh failed', [
                     'key' => $context->key,
                     'error' => $e->getMessage(),
                 ]);
@@ -99,7 +99,7 @@ class StrategyMiddleware implements MiddlewareInterface
             return resolve($data);
         }
 
-        $this->logger->debug('STRATEGY_STRICT: Item is stale, waiting for fresh data', ['key' => $context->key]);
+        $this->logger->debug('AsyncCache STRATEGY_STRICT: Item is stale, waiting for fresh data', ['key' => $context->key]);
 
         return $next($context);
     }

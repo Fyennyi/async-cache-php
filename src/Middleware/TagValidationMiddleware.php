@@ -61,7 +61,7 @@ class TagValidationMiddleware implements MiddlewareInterface
             return $next($context);
         }
 
-        $this->logger->debug('TAG_VALIDATION_START: Validating tags', ['key' => $context->key, 'tags' => array_keys($item->tag_versions)]);
+        $this->logger->debug('AsyncCache TAG_VALIDATION_START: Validating tags', ['key' => $context->key, 'tags' => array_keys($item->tag_versions)]);
 
         $tags = array_map('strval', array_keys($item->tag_versions));
 
@@ -72,7 +72,7 @@ class TagValidationMiddleware implements MiddlewareInterface
             function (array $current_versions) use ($context, $item, $next) {
                 foreach ($item->tag_versions as $tag => $saved_version) {
                     if (($current_versions[$tag] ?? null) !== $saved_version) {
-                        $this->logger->debug('TAG_INVALID: Version mismatch for tag', [
+                        $this->logger->debug('AsyncCache TAG_INVALID: Version mismatch for tag', [
                             'key' => $context->key,
                             'tag' => $tag,
                             'saved' => $saved_version,
@@ -84,7 +84,7 @@ class TagValidationMiddleware implements MiddlewareInterface
                     }
                 }
 
-                $this->logger->debug('TAG_VALID: All tags are valid', ['key' => $context->key]);
+                $this->logger->debug('AsyncCache TAG_VALID: All tags are valid', ['key' => $context->key]);
 
                 // Tags are valid. If the item is fresh, we can short-circuit and return it.
                 if ($item->isFresh($context->clock->now()->getTimestamp())) {
@@ -98,7 +98,7 @@ class TagValidationMiddleware implements MiddlewareInterface
                 return $next($context);
             },
             function (\Throwable $e) use ($context, $next) {
-                $this->logger->error('TAG_FETCH_ERROR: Failed to fetch tag versions', ['key' => $context->key, 'error' => $e->getMessage()]);
+                $this->logger->error('AsyncCache TAG_FETCH_ERROR: Failed to fetch tag versions', ['key' => $context->key, 'error' => $e->getMessage()]);
                 // On tag fetch error, we conservatively treat as stale/invalid
                 $context->stale_item = null;
 

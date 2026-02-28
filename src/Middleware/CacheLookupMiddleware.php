@@ -63,10 +63,10 @@ class CacheLookupMiddleware implements MiddlewareInterface
      */
     public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
-        $this->logger->debug('LOOKUP_START: Beginning cache retrieval', ['key' => $context->key, 'strategy' => $context->options->strategy->value]);
+        $this->logger->debug('AsyncCache LOOKUP_START: Beginning cache retrieval', ['key' => $context->key, 'strategy' => $context->options->strategy->value]);
 
         if (CacheStrategy::ForceRefresh === $context->options->strategy) {
-            $this->logger->debug('LOOKUP_BYPASS: Strategy is ForceRefresh, bypassing cache', ['key' => $context->key]);
+            $this->logger->debug('AsyncCache LOOKUP_BYPASS: Strategy is ForceRefresh, bypassing cache', ['key' => $context->key]);
             $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Bypass, 0, $context->options->tags, (float) $context->clock->now()->format('U.u')));
 
             return $next($context);
@@ -75,7 +75,7 @@ class CacheLookupMiddleware implements MiddlewareInterface
         return $this->storage->get($context->key, $context->options)->then(
             function ($cached_item) use ($context, $next) {
                 if (! ($cached_item instanceof CachedItem)) {
-                    $this->logger->debug('LOOKUP_MISS: Item not found in cache', ['key' => $context->key]);
+                    $this->logger->debug('AsyncCache LOOKUP_MISS: Item not found in cache', ['key' => $context->key]);
                     $this->dispatcher?->dispatch(new CacheMissEvent($context->key, (float) $context->clock->now()->format('U.u')));
 
                     return $next($context);
@@ -90,7 +90,7 @@ class CacheLookupMiddleware implements MiddlewareInterface
                     $check = $now_ts - ($cached_item->generation_time * $context->options->x_fetch_beta * log($rand));
 
                     if ($check > $cached_item->logical_expire_time) {
-                        $this->logger->debug('LOOKUP_XFETCH: Probabilistic early expiration triggered', ['key' => $context->key]);
+                        $this->logger->debug('AsyncCache LOOKUP_XFETCH: Probabilistic early expiration triggered', ['key' => $context->key]);
                         $now = (float) $context->clock->now()->format('U.u');
                         $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::XFetch, $context->getElapsedTime(), $context->options->tags, $now));
 
@@ -108,15 +108,15 @@ class CacheLookupMiddleware implements MiddlewareInterface
                 }
 
                 if ($is_fresh) {
-                    $this->logger->debug('LOOKUP_FRESH: Fresh item found in cache', ['key' => $context->key]);
+                    $this->logger->debug('AsyncCache LOOKUP_FRESH: Fresh item found in cache', ['key' => $context->key]);
                 } else {
-                    $this->logger->debug('LOOKUP_STALE: Stale item found in cache', ['key' => $context->key]);
+                    $this->logger->debug('AsyncCache LOOKUP_STALE: Stale item found in cache', ['key' => $context->key]);
                 }
 
                 return $next($context);
             },
             function (\Throwable $e) use ($context, $next) {
-                $this->logger->error('LOOKUP_ERROR: Cache retrieval failed', ['key' => $context->key, 'error' => $e->getMessage()]);
+                $this->logger->error('AsyncCache LOOKUP_ERROR: Cache retrieval failed', ['key' => $context->key, 'error' => $e->getMessage()]);
 
                 return $next($context);
             }

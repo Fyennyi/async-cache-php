@@ -68,7 +68,7 @@ class RateLimitMiddleware implements MiddlewareInterface
             return $next($context);
         }
 
-        $this->logger->debug('RATELIMIT_CHECK: Checking rate limit', [
+        $this->logger->debug('AsyncCache RATELIMIT_CHECK: Checking rate limit', [
             'key' => $context->key,
             'rate_limit_key' => $rate_limit_key,
         ]);
@@ -80,7 +80,7 @@ class RateLimitMiddleware implements MiddlewareInterface
             return $next($context);
         }
 
-        $this->logger->warning('RATELIMIT_EXCEEDED: Rate limit exceeded', [
+        $this->logger->warning('AsyncCache RATELIMIT_EXCEEDED: Rate limit exceeded', [
             'key' => $context->key,
             'rate_limit_key' => $rate_limit_key,
         ]);
@@ -90,7 +90,7 @@ class RateLimitMiddleware implements MiddlewareInterface
         $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::RateLimited, $context->getElapsedTime(), $context->options->tags, $now));
 
         if ($context->options->serve_stale_if_limited && null !== $context->stale_item) {
-            $this->logger->debug('RATELIMIT_SERVE_STALE: Serving stale data due to rate limit', [
+            $this->logger->debug('AsyncCache RATELIMIT_SERVE_STALE: Serving stale data due to rate limit', [
                 'key' => $context->key,
             ]);
 

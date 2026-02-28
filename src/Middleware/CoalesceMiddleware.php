@@ -58,7 +58,7 @@ class CoalesceMiddleware implements MiddlewareInterface
         if (isset($this->pending[$context->key])) {
             /** @var PromiseInterface<T> $pending_promise */
             $pending_promise = $this->pending[$context->key];
-            $this->logger?->debug('AsyncCache COALESCE_HIT: returning existing promise', ['key' => $context->key]);
+            $this->logger?->debug('AsyncCache COALESCE_HIT: Returning existing promise for concurrent request', ['key' => $context->key]);
 
             return $pending_promise;
         }
@@ -71,9 +71,9 @@ class CoalesceMiddleware implements MiddlewareInterface
         $promise->finally(function () use ($context) {
             unset($this->pending[$context->key]);
         })->catch(function (\Throwable $e) use ($context) {
-            $this->logger?->debug('AsyncCache COALESCE_ERROR: pending request failed', [
+            $this->logger?->debug('AsyncCache COALESCE_ERROR: Concurrent request failed', [
                 'key' => $context->key,
-                'msg' => $e->getMessage()
+                'error' => $e->getMessage()
             ]);
         });
 
