@@ -62,8 +62,12 @@ class SourceFetchMiddleware implements MiddlewareInterface
             /** @var PromiseInterface<T> $promise */
             $promise = $next($context);
 
-            return $promise->then(
-                /** @param T $data */
+            /** @var PromiseInterface<T> $result */
+            $result = $promise->then(
+                /**
+                 * @param  T $data
+                 * @return T
+                 */
                 function ($data) use ($context, $start) {
                     $now = (float) $context->clock->now()->format('U.u');
                     $generation_time = $now - $start;
@@ -101,6 +105,8 @@ class SourceFetchMiddleware implements MiddlewareInterface
 
                 throw $e;
             });
+
+            return $result;
         } catch (\Throwable $e) {
             return \React\Promise\reject($e);
         }
