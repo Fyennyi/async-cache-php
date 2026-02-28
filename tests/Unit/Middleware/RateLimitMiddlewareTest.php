@@ -4,10 +4,9 @@ namespace Tests\Unit\Middleware;
 
 use Fyennyi\AsyncCache\CacheOptions;
 use Fyennyi\AsyncCache\Core\CacheContext;
-use Fyennyi\AsyncCache\Enum\CacheStatus;
+use Fyennyi\AsyncCache\Exception\RateLimitException;
 use Fyennyi\AsyncCache\Middleware\RateLimitMiddleware;
 use Fyennyi\AsyncCache\Model\CachedItem;
-use Fyennyi\AsyncCache\Exception\RateLimitException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\EventDispatcher\EventDispatcherInterface;
@@ -42,7 +41,7 @@ class RateLimitMiddlewareTest extends TestCase
     {
         $context = new CacheContext('k', fn () => null, new CacheOptions(), $this->clock);
         $next = fn () => resolve('ok');
-        
+
         $this->assertSame('ok', await($this->middleware->handle($context, $next)));
 
         $middlewareNoLimiter = new RateLimitMiddleware(null, $this->logger);
@@ -56,10 +55,10 @@ class RateLimitMiddlewareTest extends TestCase
         $next = fn () => resolve('ok');
 
         $rateLimit = new RateLimit(10, new \DateTimeImmutable(), true, 10);
-        
+
         $this->factory->expects($this->once())->method('create')->with($key)->willReturn($this->limiter);
         $this->limiter->expects($this->once())->method('consume')->willReturn($rateLimit);
-        
+
         $this->assertSame('ok', await($this->middleware->handle($context, $next)));
     }
 
@@ -70,10 +69,10 @@ class RateLimitMiddlewareTest extends TestCase
         $next = fn () => resolve('ok');
 
         $rateLimit = new RateLimit(0, new \DateTimeImmutable(), false, 10);
-        
+
         $this->factory->method('create')->willReturn($this->limiter);
         $this->limiter->method('consume')->willReturn($rateLimit);
-        
+
         $this->expectException(RateLimitException::class);
         await($this->middleware->handle($context, $next));
     }
@@ -87,10 +86,10 @@ class RateLimitMiddlewareTest extends TestCase
         $next = fn () => resolve('should_not_be_called');
 
         $rateLimit = new RateLimit(0, new \DateTimeImmutable(), false, 10);
-        
+
         $this->factory->method('create')->willReturn($this->limiter);
         $this->limiter->method('consume')->willReturn($rateLimit);
-        
+
         $this->assertSame('stale_data', await($this->middleware->handle($context, $next)));
     }
 }

@@ -34,7 +34,7 @@ class StrategyMiddlewareTest extends TestCase
     {
         $context = new CacheContext('k', fn () => null, new CacheOptions(), $this->clock);
         $next = fn () => resolve('from_next');
-        
+
         $this->assertSame('from_next', await($this->middleware->handle($context, $next)));
     }
 
@@ -44,7 +44,7 @@ class StrategyMiddlewareTest extends TestCase
         $context = new CacheContext('k', fn () => null, new CacheOptions(), $this->clock);
         $context->stale_item = $item;
         $next = fn () => resolve('should_not_be_called');
-        
+
         $this->assertSame('data', await($this->middleware->handle($context, $next)));
     }
 
@@ -53,13 +53,13 @@ class StrategyMiddlewareTest extends TestCase
         $item = new CachedItem('stale_data', $this->clock->now()->getTimestamp() - 10);
         $context = new CacheContext('k', fn () => null, new CacheOptions(strategy: CacheStrategy::Background), $this->clock);
         $context->stale_item = $item;
-        
+
         $nextCalled = false;
         $next = function () use (&$nextCalled) {
             $nextCalled = true;
             return resolve('refreshed_data');
         };
-        
+
         $this->assertSame('stale_data', await($this->middleware->handle($context, $next)));
         $this->assertTrue($nextCalled);
     }
@@ -69,9 +69,9 @@ class StrategyMiddlewareTest extends TestCase
         $item = new CachedItem('stale_data', $this->clock->now()->getTimestamp() - 10);
         $context = new CacheContext('k', fn () => null, new CacheOptions(strategy: CacheStrategy::Strict), $this->clock);
         $context->stale_item = $item;
-        
+
         $next = fn () => resolve('fresh_data');
-        
+
         $this->assertSame('fresh_data', await($this->middleware->handle($context, $next)));
     }
 }

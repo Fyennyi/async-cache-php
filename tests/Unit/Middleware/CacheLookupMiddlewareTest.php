@@ -35,9 +35,9 @@ class CacheLookupMiddlewareTest extends TestCase
         $context = new CacheContext('k', fn () => null, new CacheOptions(), $this->clock);
         $this->storage->method('get')->willReturn(\React\Promise\resolve($item));
         $next = fn () => \React\Promise\resolve('from_next');
-        
+
         $res = await($this->middleware->handle($context, $next));
-        
+
         $this->assertSame('from_next', $res);
         $this->assertSame($item, $context->stale_item);
     }
@@ -47,7 +47,7 @@ class CacheLookupMiddlewareTest extends TestCase
         $context = new CacheContext('k', fn () => null, new CacheOptions(), $this->clock);
         $this->storage->method('get')->willReturn(\React\Promise\resolve(null));
         $next = fn () => \React\Promise\resolve('from_next');
-        
+
         $this->assertSame('from_next', await($this->middleware->handle($context, $next)));
         $this->assertNull($context->stale_item);
     }
@@ -57,7 +57,7 @@ class CacheLookupMiddlewareTest extends TestCase
         $context = new CacheContext('k', fn () => null, new CacheOptions(strategy: CacheStrategy::ForceRefresh), $this->clock);
         $this->storage->expects($this->never())->method('get');
         $next = fn () => \React\Promise\resolve('bypassed');
-        
+
         $this->assertSame('bypassed', await($this->middleware->handle($context, $next)));
     }
 
@@ -67,9 +67,9 @@ class CacheLookupMiddlewareTest extends TestCase
         $context = new CacheContext('k', fn () => null, new CacheOptions(x_fetch_beta: 1000.0), $this->clock);
         $this->storage->method('get')->willReturn(\React\Promise\resolve($item));
         $next = fn () => \React\Promise\resolve('xfetch_triggered');
-        
+
         $res = await($this->middleware->handle($context, $next));
-        
+
         $this->assertSame('xfetch_triggered', $res);
         $this->assertNotNull($context->stale_item);
         $this->assertFalse($context->stale_item->isFresh($this->clock->now()->getTimestamp()));
@@ -80,7 +80,7 @@ class CacheLookupMiddlewareTest extends TestCase
         $context = new CacheContext('k', fn () => null, new CacheOptions(), $this->clock);
         $this->storage->method('get')->willReturn(\React\Promise\reject(new \Exception('Storage error')));
         $next = fn () => \React\Promise\resolve('fallback');
-        
+
         $this->assertSame('fallback', await($this->middleware->handle($context, $next)));
     }
 }
