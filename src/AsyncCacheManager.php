@@ -32,8 +32,10 @@ use Fyennyi\AsyncCache\Core\Pipeline;
 use Fyennyi\AsyncCache\Middleware\AsyncLockMiddleware;
 use Fyennyi\AsyncCache\Middleware\CacheLookupMiddleware;
 use Fyennyi\AsyncCache\Middleware\CoalesceMiddleware;
+use Fyennyi\AsyncCache\Middleware\RateLimitMiddleware;
 use Fyennyi\AsyncCache\Middleware\SourceFetchMiddleware;
 use Fyennyi\AsyncCache\Middleware\StaleOnErrorMiddleware;
+use Fyennyi\AsyncCache\Middleware\StrategyMiddleware;
 use Fyennyi\AsyncCache\Middleware\TagValidationMiddleware;
 use Fyennyi\AsyncCache\Storage\AsyncCacheAdapterInterface;
 use Fyennyi\AsyncCache\Storage\CacheStorage;
@@ -48,7 +50,7 @@ use React\Promise\PromiseInterface;
 use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\SemaphoreStore;
-use Symfony\Component\RateLimiter\LimiterInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use function React\Promise\Timer\resolve as delay;
 
 /**
@@ -60,7 +62,7 @@ final class AsyncCacheManager
     private CacheStorage $storage;
     private LockFactory $lock_factory;
     private ClockInterface $clock;
-    private ?LimiterInterface $rate_limiter;
+    private ?RateLimiterFactoryInterface $rate_limiter;
 
     /**
      * Creates the manager from configuration.
@@ -86,11 +88,28 @@ final class AsyncCacheManager
         $this->storage = new CacheStorage($cache_adapter, $logger, $serializer, $this->clock);
 
         $default_middlewares = [
+            // 1. Request deduplication
             new CoalesceMiddleware($logger),
-            new StaleOnErrorMiddleware($logger, $config->getDispatcher()),
+
+            // 2. Cache lookup + freshness check
             new CacheLookupMiddleware($this->storage, $logger, $config->getDispatcher()),
+
+            // 3. Tag validation
             new TagValidationMiddleware($this->storage, $logger),
+
+            // 4. Strategy handling
+            new StrategyMiddleware($logger, $config->getDispatcher()),
+
+            // 5. Rate limiting
+            new RateLimitMiddleware($this->rate_limiter, $logger, $config->getDispatcher()),
+
+            // 6. Lock acquisition
             new AsyncLockMiddleware($this->lock_factory, $this->storage, $logger, $config->getDispatcher()),
+
+            // 7. Stale-on-error fallback (NOW in correct position)
+            new StaleOnErrorMiddleware($logger, $config->getDispatcher()),
+
+            // 8. Final source fetch
             new SourceFetchMiddleware($this->storage, $logger, $config->getDispatcher())
         ];
 
@@ -133,7 +152,7 @@ final class AsyncCacheManager
      *   });
      * @example
      *   // Using an async factory that returns a Promise
-     *   $manager->wrap('user:42', function () use ($http) {
+     *   $manager->wrap('user:42', function use ($http) {
      *       return $http->getJson('https://api.example/users/42');
      *   }, new CacheOptions(ttl: 60))->then(function ($value) {
      *       // handle async result
@@ -286,18 +305,20 @@ final class AsyncCacheManager
     /**
      * Returns the rate limiter instance.
      *
-     * @return LimiterInterface|null The Symfony Rate Limiter or null if not set
+     * @return RateLimiterFactoryInterface|null The Symfony Rate Limiter factory or null if not set
      */
-    public function getRateLimiter() : ?LimiterInterface
+    public function getRateLimiter() : ?RateLimiterFactoryInterface
     {
         return $this->rate_limiter;
     }
 
     /**
      * Resets the rate limiter state.
+     *
+     * @note RateLimiterFactoryInterface does not support global reset in Symfony.
      */
     public function clearRateLimiter() : void
     {
-        $this->rate_limiter?->reset();
+        // No-op for factory.
     }
 }
