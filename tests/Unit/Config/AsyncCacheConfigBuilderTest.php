@@ -10,7 +10,7 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
 use Symfony\Component\Lock\LockFactory;
-use Symfony\Component\RateLimiter\LimiterInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
 class AsyncCacheConfigBuilderTest extends TestCase
 {
@@ -60,7 +60,7 @@ class AsyncCacheConfigBuilderTest extends TestCase
 
     public function testWithRateLimiter() : void
     {
-        $rateLimiter = $this->createMock(LimiterInterface::class);
+        $rateLimiter = $this->createMock(RateLimiterFactoryInterface::class);
 
         $config = AsyncCacheConfig::builder($this->cache)
             ->withRateLimiter($rateLimiter)
@@ -105,7 +105,7 @@ class AsyncCacheConfigBuilderTest extends TestCase
     public function testFluentInterface() : void
     {
         $logger = $this->createMock(LoggerInterface::class);
-        $rateLimiter = $this->createMock(LimiterInterface::class);
+        $rateLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $dispatcher = $this->createMock(EventDispatcherInterface::class);
         $middleware = $this->createMock(MiddlewareInterface::class);
 
