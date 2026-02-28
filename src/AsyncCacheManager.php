@@ -313,16 +313,6 @@ final class AsyncCacheManager
     }
 
     /**
-     * Resets the rate limiter state.
-     *
-     * @note RateLimiterFactoryInterface does not support global reset in Symfony.
-     */
-    public function clearRateLimiter() : void
-    {
-        // No-op for factory.
-    }
-
-    /**
      * Resets the rate limit for a specific key.
      *
      * @param string $key The rate limit key to reset
