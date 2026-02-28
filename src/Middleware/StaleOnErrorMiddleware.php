@@ -52,7 +52,7 @@ class StaleOnErrorMiddleware implements MiddlewareInterface
     }
 
     /**
-     * Catches errors and returns stale data if available.
+     * Catches errors from downstream middlewares (like SourceFetch) and returns stale data if available.
      *
      * @template T
      *
@@ -61,24 +61,19 @@ class StaleOnErrorMiddleware implements MiddlewareInterface
      */
     public function handle(CacheContext $context, callable $next) : PromiseInterface
     {
-        /** @var PromiseInterface<T> $promise */
-        $promise = $next($context);
-
-        return $promise->catch(
-            function (\Throwable $reason) use ($context) {
-                $msg = $reason->getMessage();
-
+        return $next($context)->catch(
+            function (\Throwable $error) use ($context) {
                 if (null !== $context->stale_item) {
-                    $this->logger->warning('AsyncCache STALE_ON_ERROR: fetch failed, serving stale data', [
+                    $this->logger->warning('STALE_ON_ERROR: Fetch failed, serving stale data as fallback', [
                         'key' => $context->key,
-                        'reason' => $msg
+                        'error' => $error->getMessage(),
                     ]);
 
                     $now = (float) $context->clock->now()->format('U.u');
                     $this->dispatcher?->dispatch(new CacheStatusEvent(
                         $context->key,
                         CacheStatus::Stale,
-                        $now - $context->start_time,
+                        $context->getElapsedTime(),
                         $context->options->tags,
                         $now
                     ));
@@ -89,7 +84,12 @@ class StaleOnErrorMiddleware implements MiddlewareInterface
                     return $stale_data;
                 }
 
-                throw $reason;
+                $this->logger->error('FETCH_ERROR: Fetch failed and no stale data available', [
+                    'key' => $context->key,
+                    'error' => $error->getMessage(),
+                ]);
+
+                throw $error;
             }
         );
     }
