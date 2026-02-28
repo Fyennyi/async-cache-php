@@ -15,13 +15,13 @@ use Psr\SimpleCache\CacheInterface;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\InMemoryStore;
-use Symfony\Component\RateLimiter\LimiterInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use function React\Async\await;
 
 class AsyncCacheManagerTest extends TestCase
 {
     private MockObject|CacheInterface $cache;
-    private MockObject|LimiterInterface $rateLimiter;
+    private MockObject|RateLimiterFactoryInterface $rateLimiter;
     private LockFactory $lockFactory;
     private MockClock $clock;
     private AsyncCacheManager $manager;
@@ -29,7 +29,7 @@ class AsyncCacheManagerTest extends TestCase
     protected function setUp() : void
     {
         $this->cache = $this->createMock(CacheInterface::class);
-        $this->rateLimiter = $this->createMock(LimiterInterface::class);
+        $this->rateLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->lockFactory = new LockFactory(new InMemoryStore()); // Use real in-memory locks
         $this->clock = new MockClock();
 
@@ -234,7 +234,6 @@ class AsyncCacheManagerTest extends TestCase
 
     public function testClearAndRateLimiter() : void
     {
-        $this->rateLimiter->expects($this->once())->method('reset');
         $this->manager->clearRateLimiter();
         $this->assertSame($this->rateLimiter, $this->manager->getRateLimiter());
     }
