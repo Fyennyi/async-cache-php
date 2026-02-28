@@ -34,7 +34,6 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use React\Promise\PromiseInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
-
 use function React\Promise\resolve;
 
 /**

@@ -33,7 +33,6 @@ use Fyennyi\AsyncCache\Event\CacheStatusEvent;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use React\Promise\PromiseInterface;
-
 use function React\Promise\resolve;
 
 /**
