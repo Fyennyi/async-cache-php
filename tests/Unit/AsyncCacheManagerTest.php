@@ -238,6 +238,21 @@ class AsyncCacheManagerTest extends TestCase
         $this->assertSame($this->rateLimiter, $this->manager->getRateLimiter());
     }
 
+    public function testResetRateLimit() : void
+    {
+        $key = 'api_limit_key';
+        $limiter = $this->createMock(\Symfony\Component\RateLimiter\LimiterInterface::class);
+
+        $this->rateLimiter->expects($this->once())
+            ->method('create')
+            ->with($key)
+            ->willReturn($limiter);
+
+        $limiter->expects($this->once())->method('reset');
+
+        $this->manager->resetRateLimit($key);
+    }
+
     public function testConstructorWrappers() : void
     {
         $psr = $this->createMock(CacheInterface::class);
