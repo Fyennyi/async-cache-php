@@ -166,7 +166,10 @@ class AsyncLockMiddleware implements MiddlewareInterface
 
         $attempt();
 
-        return $deferred->promise();
+        /** @var PromiseInterface<T> $promise */
+        $promise = $deferred->promise();
+
+        return $promise;
     }
 
     /**
