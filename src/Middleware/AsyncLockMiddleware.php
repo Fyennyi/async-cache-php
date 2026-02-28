@@ -82,6 +82,10 @@ class AsyncLockMiddleware implements MiddlewareInterface
         if (null !== $context->stale_item) {
             $this->logger->debug('LOCK_BUSY: Lock is busy, returning stale data immediately', ['key' => $context->key]);
 
+            $now = (float) $context->clock->now()->format('U.u');
+            $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Stale, $context->getElapsedTime(), $context->options->tags, $now));
+            $this->dispatcher?->dispatch(new CacheHitEvent($context->key, $context->stale_item->data, $now));
+
             /** @var T $stale_data */
             $stale_data = $context->stale_item->data;
 
