@@ -140,7 +140,7 @@ class CacheStorage
             return $this->fetchTagVersions($options->tags, true)->then(function ($tag_versions) use ($key, $physical_ttl, $prepare_item) {
                 $item = $prepare_item($tag_versions);
 
-                return $this->adapter->set($key, $item, $physical_ttl);
+                return $this->adapter->set($key, $item, $physical_ttl)->then(fn() => $item);
             });
         }
 
@@ -217,13 +217,11 @@ class CacheStorage
 
         $keys = array_map(fn ($t) => self::TAG_PREFIX . $t, $tags);
 
-        return $this->adapter->getMultiple($keys)->then(function ($raw_versions) use ($tags, $create_missing) {
             $versions = [];
             $set_promises = [];
             $raw_versions = is_array($raw_versions) ? $raw_versions : [];
 
             foreach ($tags as $tag) {
-                $version = $raw_versions[self::TAG_PREFIX . $tag] ?? null;
                 if (null === $version && $create_missing) {
                     $version = $this->generateVersion();
                     $set_promises[] = $this->adapter->set(self::TAG_PREFIX . $tag, $version, 86400 * 30);
