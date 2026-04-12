@@ -65,7 +65,7 @@ class CacheStorageTest extends TestCase
             return $d->promise();
         });
 
-        $this->assertTrue(await($this->storage->set('key', $data, $options)));
+        $this->assertInstanceOf(\Fyennyi\AsyncCache\Model\CachedItem::class, await($this->storage->set('key', $data, $options)));
     }
 
     public function testGetReturnsNullIfDecompressionFails() : void

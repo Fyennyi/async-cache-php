@@ -166,7 +166,11 @@ class CacheStorage
             $promises[] = $this->adapter->set(self::TAG_PREFIX . $tag, $this->generateVersion(), 86400 * 30);
         }
 
-        return all($promises)->then(fn () => true);
+        return all($promises)->then(function () use ($tags) {
+            $this->logger->info('AsyncCache TAGS_INVALIDATED', ['tags' => $tags]);
+
+            return true;
+        });
     }
 
     /**
@@ -253,5 +257,36 @@ class CacheStorage
     private function generateVersion() : string
     {
         return uniqid('', true);
+    }
+
+    /**
+     * Deletes an item from the cache by its unique key asynchronously.
+     *
+     * @param  string                 $key The unique cache key identifier of the item to delete
+     * @return PromiseInterface<bool>
+     */
+    public function delete(string $key) : PromiseInterface
+    {
+        return $this->adapter->delete($key);
+    }
+
+    /**
+     * Wipes clean the entire cache's keys asynchronously.
+     *
+     * @return PromiseInterface<bool>
+     */
+    public function clear() : PromiseInterface
+    {
+        return $this->adapter->clear();
+    }
+
+    /**
+     * Returns the underlying asynchronous cache adapter.
+     *
+     * @return AsyncCacheAdapterInterface The low-level adapter implementation
+     */
+    public function getAdapter() : AsyncCacheAdapterInterface
+    {
+        return $this->adapter;
     }
 }

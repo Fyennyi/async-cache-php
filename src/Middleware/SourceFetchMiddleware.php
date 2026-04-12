@@ -23,10 +23,15 @@ class SourceFetchMiddleware implements MiddlewareInterface
                 $generation_time = $now - $start;
                 $this->dispatcher?->dispatch(new CacheStatusEvent($context->key, CacheStatus::Miss, $context->getElapsedTime(), $context->options->tags, $now));
 
-                // ВАЖЛИВО: чекаємо завершення запису
                 return $this->storage->set($context->key, $data, $context->options, $generation_time)
                     ->then(fn () => $data)
-                    ->catch(fn () => $data);
+                    ->catch(function (\Throwable $e) use ($context, $data) {
+                        $this->logger->error('AsyncCache PERSISTENCE_ERROR: Failed to save fresh data to cache', [
+                            'key' => $context->key,
+                            'error' => $e->getMessage(),
+                        ]);
+                        return $data;
+                    });
             });
         } catch (\Throwable $e) {
             return \React\Promise\reject($e);
