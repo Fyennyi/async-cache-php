@@ -102,11 +102,11 @@ class CacheStorage
     /**
      * Stores an item in the cache asynchronously.
      *
-     * @param  string                 $key             The cache key identifier
-     * @param  mixed                  $data            The raw data value to store
-     * @param  CacheOptions           $options         Configuration for TTL, tags and compression
-     * @param  float                  $generation_time Time taken to generate the data in seconds
-     * @return PromiseInterface<bool>
+     * @param  string                       $key             The cache key identifier
+     * @param  mixed                        $data            The raw data value to store
+     * @param  CacheOptions                 $options         Configuration for TTL, tags and compression
+     * @param  float                        $generation_time Time taken to generate the data in seconds
+     * @return PromiseInterface<CachedItem>
      */
     public function set(string $key, mixed $data, CacheOptions $options, float $generation_time = 0.0) : PromiseInterface
     {
