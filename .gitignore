@@ -1,9 +1,20 @@
-vendor/
-composer.lock
-.phpunit.result.cache
-.phpunit.cache/
-coverage-report/
-clover.xml
-phpunit.xml
-.php-cs-fixer.cache
+# Dependencies
+/vendor/
+/composer.lock
+
+# Environment
 .env
+
+# Caches
+.php-cs-fixer.cache
+.phpunit.cache/
+.phpunit.result.cache
+
+# Configuration overrides (local only)
+phpstan.neon
+phpunit.xml
+
+# Reports and Coverage
+clover.xml
+coverage-report/
+reports/
