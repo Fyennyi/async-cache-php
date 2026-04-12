@@ -74,4 +74,27 @@ class StrategyMiddlewareTest extends TestCase
 
         $this->assertSame('fresh_data', await($this->middleware->handle($context, $next)));
     }
+
+    public function testBackgroundStrategyLogsErrorOnRefreshFailure() : void
+    {
+        $item = new CachedItem('stale_data', $this->clock->now()->getTimestamp() - 10);
+        $context = new CacheContext('k', fn () => null, new CacheOptions(strategy: CacheStrategy::Background), $this->clock);
+        $context->stale_item = $item;
+
+        $exception = new \RuntimeException('Refresh failed');
+        $next = fn () => \React\Promise\reject($exception);
+
+        $this->logger->expects($this->once())
+            ->method('error')
+            ->with(
+                $this->equalTo('AsyncCache STRATEGY_BACKGROUND_ERROR: Background refresh failed'),
+                $this->callback(function ($context_data) use ($exception) {
+                    return 'k' === $context_data['key'] && 'Refresh failed' === $context_data['error'];
+                })
+            );
+
+        $result = await($this->middleware->handle($context, $next));
+
+        $this->assertSame('stale_data', $result);
+    }
 }
