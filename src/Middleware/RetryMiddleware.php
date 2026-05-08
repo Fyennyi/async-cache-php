@@ -56,6 +56,26 @@ class RetryMiddleware implements MiddlewareInterface
     }
 
     /**
+     * Check if the exception is retryable.
+     *
+     * @return bool True if should retry, false to throw immediately
+     */
+    public function isRetryable(\Throwable $e) : bool
+    {
+        if (empty($this->retryable_exceptions)) {
+            return true;
+        }
+
+        foreach ($this->retryable_exceptions as $exceptionClass) {
+            if ($e instanceof $exceptionClass) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Handles the request with automatic retry logic.
      *
      * @template T
