@@ -54,4 +54,50 @@ class RetryMiddlewareTest extends TestCase
 
         await($middleware->handle($context, $next));
     }
+
+    public function testIsRetryableReturnsTrueWhenEmpty() : void
+    {
+        $middleware = new RetryMiddleware();
+
+        $this->assertTrue($middleware->isRetryable(new \Exception()));
+    }
+
+    public function testIsRetryableReturnsTrueWhenMatches() : void
+    {
+        $middleware = new RetryMiddleware(retryable_exceptions: [\RuntimeException::class]);
+
+        $this->assertTrue($middleware->isRetryable(new \RuntimeException()));
+    }
+
+    public function testIsRetryableReturnsFalseWhenNotMatches() : void
+    {
+        $middleware = new RetryMiddleware(retryable_exceptions: [\RuntimeException::class]);
+
+        $this->assertFalse($middleware->isRetryable(new \InvalidArgumentException()));
+    }
+
+    public function testRetryMiddlewareSkipsNonRetryable() : void
+    {
+        $middleware = new RetryMiddleware(
+            max_retries: 3,
+            initial_delay_ms: 1,
+            retryable_exceptions: [\RuntimeException::class],
+            logger: new NullLogger()
+        );
+        $clock = new MockClock();
+        $context = new CacheContext('k', fn () => null, new CacheOptions(), $clock);
+
+        $failCount = 0;
+        $next = function () use (&$failCount) {
+            $failCount++;
+            return \React\Promise\reject(new \InvalidArgumentException('non-retryable'));
+        };
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('non-retryable');
+
+        await($middleware->handle($context, $next));
+
+        $this->assertSame(1, $failCount);
+    }
 }
