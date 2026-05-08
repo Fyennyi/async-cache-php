@@ -86,4 +86,21 @@ class PsrToAsyncAdapterTest extends TestCase
         $this->expectException(\Exception::class);
         await($this->adapter->clear());
     }
+
+    public function testGetMultipleWithTraversable() : void
+    {
+        $traversable = new \ArrayIterator(['k' => 'v']);
+        $this->psr->expects($this->once())->method('getMultiple')->with(['k'])->willReturn($traversable);
+        $this->assertSame(['k' => 'v'], await($this->adapter->getMultiple(['k'])));
+    }
+
+    public function testGetMultipleWithSymfonyWrappedValue() : void
+    {
+        $wrapper = new class () {
+            public mixed $value = 'wrapped_value';
+        };
+        $this->psr->expects($this->once())->method('getMultiple')->with(['k'])->willReturn(['k' => $wrapper]);
+        $result = await($this->adapter->getMultiple(['k']));
+        $this->assertSame(['k' => 'wrapped_value'], $result);
+    }
 }
