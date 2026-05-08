@@ -39,15 +39,17 @@ class RetryMiddleware implements MiddlewareInterface
     private LoggerInterface $logger;
 
     /**
-     * @param int                  $max_retries      Maximum number of retry attempts
-     * @param int                  $initial_delay_ms Delay before the first retry in milliseconds
-     * @param float                $multiplier       Multiplier for exponential backoff
-     * @param LoggerInterface|null $logger           Logger for reporting retries
+     * @param int                             $max_retries          Maximum number of retry attempts
+     * @param int                             $initial_delay_ms     Delay before the first retry in milliseconds
+     * @param float                           $multiplier           Multiplier for exponential backoff
+     * @param array<class-string<\Throwable>> $retryable_exceptions Exceptions to retry (empty = retry all)
+     * @param LoggerInterface|null            $logger               Logger for reporting retries
      */
     public function __construct(
         private int $max_retries = 3,
         private int $initial_delay_ms = 100,
         private float $multiplier = 2.0,
+        private array $retryable_exceptions = [],
         ?LoggerInterface $logger = null
     ) {
         $this->logger = $logger ?? new NullLogger();
