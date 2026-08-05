@@ -12,4 +12,4 @@ jobs:
     steps:
     - uses: actions/checkout@v7
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag kde-plasma:$(date +%s)
+      run: docker build . --file Dockerfile --tag async-cache-php:$(date +%s)
