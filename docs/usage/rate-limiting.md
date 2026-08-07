@@ -30,11 +30,12 @@ $manager = new AsyncCacheManager(
 ## How It Interacts with Cache
 
 When a cache item is stale and a refresh is needed:
+
 1. The manager checks if a `rate_limit_key` is provided in `CacheOptions`.
 2. It uses the factory to create/get a limiter for that key: `$factory->create($rate_limit_key)`.
 3. It calls `->consume(1)` on that limiter.
 4. If **Accepted**: The pipeline continues to fetch fresh data.
-5. If **Rejected**: 
+5. If **Rejected**:
     - If `serve_stale_if_limited` is **true** and stale data exists in the context, the stale data is returned immediately.
     - Otherwise, a `RateLimitException` is thrown.
 
