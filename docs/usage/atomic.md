@@ -22,10 +22,10 @@ Increases a value by a given step (default 1). If the key doesn't exist, it star
 
 ```php
 // Increment 'page_views' by 1
-$newValue = $manager->increment('page_views')->wait();
+$newValue = \React\Async\await($manager->increment('page_views'));
 
 // Increment by 5
-$newValue = $manager->increment('page_views', 5)->wait();
+$newValue = \React\Async\await($manager->increment('page_views', 5));
 ```
 
 ### Decrement
@@ -34,7 +34,7 @@ Decreases a value by a given step.
 
 ```php
 // Decrement stock count
-$newValue = $manager->decrement('product_stock')->wait();
+$newValue = \React\Async\await($manager->decrement('product_stock'));
 ```
 
 ## Configuration
