@@ -115,7 +115,7 @@ class RetryMiddleware implements MiddlewareInterface
                     throw $reason;
                 }
 
-                if (!$this->isRetryable($reason)) {
+                if (! $this->isRetryable($reason)) {
                     throw $reason;
                 }
 
